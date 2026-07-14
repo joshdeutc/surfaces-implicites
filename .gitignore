@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Sorties générées (modèles .pt, grilles .npz, PNG produits par le code)
+output/
+data/
+Reduction_modele_quasi_Newton/output/
+Reduction_modele_quasi_Newton/data/
