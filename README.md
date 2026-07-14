@@ -56,8 +56,3 @@ globule rouge et ça reconstruit bien.
 Ce qui reste : les courbures du globule rouge, la dimension temporelle (le plan
 est déjà réfléchi mais pas encore codé) et surtout brancher les vraies données
 du BMBI.
-
-## Point pratique
-
-Pas encore de repo distant. Quand on crée celui sur gitlab.utc.fr, on ajoutera
-juste le remote et on pushera. En attendant on travaille en local.
