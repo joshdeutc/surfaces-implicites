@@ -11,6 +11,9 @@ venv/
 # Jupyter
 .ipynb_checkpoints/
 
+# Dossiers d'outils locaux (ne pas publier)
+.claude/
+
 # Sorties générées (modèles .pt, grilles .npz, PNG produits par le code)
 output/
 data/
