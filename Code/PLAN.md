@@ -31,8 +31,8 @@ initiale, qui sert seulement à valider la machinerie).
 | 4 | Métriques quantitatives SANS la formule (Chamfer, IoU, eikonal) | `metrics.py` | fait |
 | **5** | **Courbures et invariants géométriques** (article Kuchel 2021) | `curvature.py`, `invariants.py` | fait |
 | **6** | **Représentation polynomiale** de `f` (compression, explicabilité) | `polyfit.py` | fait |
-| 7 | Dedans/dehors depuis un vrai nuage de points (normales + produit scalaire) | `data.py` | à faire |
-| 8 | Morphing `θf₁+(1−θ)f₂` + union / intersection / différence | nouveau module | à faire |
+| **7** | **Dedans/dehors depuis un vrai nuage de points** (normales + produit scalaire) | `inside_outside.py`, `cloud_io.py` | fait |
+| **8** | **Morphing `θf₁+(1−θ)f₂` + union / intersection / différence** | `csg.py` | fait |
 | 9 | Robustesse : bruit, points épars, vue partielle | `data.py` | à faire |
 | 10 | Famille de formes + code latent (lien réduction de modèle) | `model.py`, `train.py` | à faire |
 | 11 | Brancher les vraies données de capsules (sorties EF du BMBI) | nouveau module | bloqué |
@@ -124,6 +124,68 @@ Perte = somme de termes (méthode IGR, Gropp et al. 2020) :
       artefact du profil d'Evans-Fung, qui n'est pas algébrique. Le vrai globule
       rouge **est** une quartique : 10 coefficients contre 197 886 poids pour
       IGRNet, soit un facteur 19 789.
+
+- [x] Étape 7 — **apprendre depuis un nuage de points seul** (`src/inside_outside.py`,
+      `src/cloud_io.py`, `main_cloud.py`). C'est le mode qui s'appliquera aux
+      vraies capsules : un maillage Éléments Finis ne vient pas avec une formule.
+      Le signe dedans/dehors est déduit du point de surface le plus proche et du
+      produit scalaire avec sa normale (méthode du mail de F. De Vuyst).
+      Le faux jeu de données passe par un vrai maillage triangulaire dont les
+      normales sont calculées par triangle puis orientées vers l'extérieur par
+      le volume signé.
+        * accord du signe hors de la coquille `|f| > 0.05` : **100 %** sur
+          l'ellipsoïde comme sur le globule quartique
+        * dimensionnement : 500 points → 99.72 % d'accord global, 6000 → 99.98 %,
+          20000 → 99.99 %. À l'échelle du globule rouge (8 µm de diamètre), un
+          espacement de nuage de 0.078 µm suffit.
+        * effet du vote sur `k` voisins — **l'hypothèse de départ était fausse** :
+          sur nuage propre `k = 1` est le meilleur partout (99.88 % dans le creux
+          contre 99.41 % à `k = 15`), les voisins lointains venant de la cuvette
+          opposée votent à contresens. L'ordre ne s'inverse que sur nuage bruité
+          (96.57 % à `k = 1` contre 98.70 % à `k = 15`). `k` règle la robustesse
+          au bruit, pas la géométrie. Retenu : `k = 5` pour des données mesurées.
+        * **perd-on quelque chose à se passer de la formule ? Non.** Trois graines,
+          sur CPU pour être reproductible : Chamfer 0.01593 ± 0.00113 (nuage)
+          contre 0.01582 ± 0.00056 (formule), IoU 0.96876 contre 0.96898 — tous
+          les écarts sont plus petits que la dispersion entre graines. Le
+          mécanisme : les deux étiquetages ne diffèrent que sur 4 points sur
+          20 000. Ce n'est donc pas une preuve de robustesse à un étiquetage
+          dégradé, question non posée ici.
+      Zéro appel à la formule pendant l'entraînement, vérifié par un compteur.
+      Détail dans `RESULTATS_nuage.md`.
+
+- [x] Étape 8 — **morphing et opérations booléennes** (`src/csg.py`, `main_morph.py`).
+      Recommandation du mail : `θ·f₁ + (1−θ)·f₂` pour interpoler, `min` / `max` /
+      `max(f₁,−f₂)` pour union, intersection et différence. Le module marche à
+      l'identique sur des formules et sur des champs appris.
+        * piège traité : le morphing n'est pas invariant par changement d'échelle
+          des champs. La quartique du globule a une pente médiane de 2.12 sur sa
+          surface contre 1.00 pour la sphère ; sans correction le chemin serait
+          tiré d'un facteur deux. Chaque champ est donc divisé par la médiane de
+          `‖∇f‖` sur sa surface, ce qui ne déplace pas `f = 0`.
+        * booléens vérifiés quantitativement : volumes confrontés aux valeurs
+          analytiques de la lentille sphérique (écart < 0.13 %), et identité
+          d'inclusion-exclusion `V(A∪B) + V(A∩B) = V(A) + V(B)` à **1.1e-06 %**.
+          Cette identité étant symétrique, elle ne prouve pas à elle seule que
+          `min` est l'union : c'est l'encadrement `V(A∩B) < V(A) < V(A∪B)` qui
+          tranche.
+        * morphing entre deux réseaux : `χ = 2` conservé, sphéricité monotone.
+          Réserve de protocole — au bloc analytique la sphère a le même volume
+          que le globule pour que la variation de volume mesure quelque chose ;
+          ce n'est pas le cas au bloc « champs appris », où la décroissance du
+          volume est en partie imposée par les extrémités.
+      Détail dans `RESULTATS_morphing.md`.
+
+- [x] Contrôle de la figure de courbure. La distribution de `K_gauss` semblait
+      contredire l'article de Kuchel. Vérification faite aux dimensions de
+      l'article : aire 128.004 µm² contre 128 annoncés, volume 85.947 µm³ contre
+      86 fL — la forme est la bonne. Et pour une surface de révolution,
+      `K_G = z'z''/(r(1+z'²)²)` : au creux `z' = 0` et `z'' > 0` donc `K_G` y est
+      MAXIMALE, à la crête d'épaisseur `z' = 0` donc `K_G = 0`, et entre les deux
+      `K_G < 0`. Un disque biconcave doit avoir un anneau de courbure négative.
+      Pas d'erreur de calcul : l'écart apparent venait des unités (coordonnées
+      réduites contre micromètres, facteur 16). Figure comparable à l'article :
+      `output/courbure_globule_micrometres.png`.
 
 ### Défaut trouvé et corrigé
 La formule `implicit_biconcave` (profil d'Evans-Fung, `np.where(r < 1, ...)`) a

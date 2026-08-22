@@ -30,6 +30,11 @@ src/
   train.py        boucles d'entraînement : MSE et IGR
   reconstruct.py  évaluation sur grille 3D + marching cubes
   metrics.py      Chamfer, Hausdorff, IoU, eikonal — SANS la formule exacte
+  inside_outside.py  dedans/dehors depuis le seul nuage orienté (KD-tree +
+                  produit scalaire avec la normale, vote sur k voisins)
+  cloud_io.py     format d'échange .npz, maillage triangulaire « façon EF »,
+                  normales par triangle orientées vers l'extérieur
+  csg.py          morphing θf₁+(1−θ)f₂, union, intersection, différence
   curvature.py    courbures gaussienne / moyenne / principales, en numpy
                   (différences finies) et en torch (autograd d'ordre 2)
   invariants.py   caractéristique d'Euler, aire, volume, Gauss-Bonnet
@@ -46,6 +51,8 @@ src/
 | `main_biconcave.py` | globule rouge biconcave + coupe de la fossette |
 | `main_step2.py` | comparaison Softplus vs Fourier, sans normales |
 | `main_poly.py` | représentation polynomiale ajustée sur le seul nuage |
+| `main_cloud.py` | chaîne complète depuis un fichier de nuage, sans aucune formule |
+| `main_morph.py` | morphing et booléens, sur formules et sur champs appris |
 | `main_curvature.py` | courbures du champ appris + contrôle Gauss-Bonnet |
 | `validate_geometry.py` | 28 vérifications des outils géométriques sur des cas connus |
 | `reconstruct_from_cache.py` | refait figure et métrique sans réentraîner |
@@ -69,8 +76,13 @@ ignoré par git.
 ## Journal des résultats
 
 - `PLAN.md` — la feuille de route et l'avancement.
-- `RESULTATS_courbures.md` — le journal détaillé du travail sur les courbures :
-  démarche, validations, résultat et limites.
+- `RESULTATS_courbures.md` — courbures et invariants : démarche, validations,
+  résultat et limites.
+- `RESULTATS_nuage.md` — apprendre depuis un nuage de points seul : fidélité du
+  signe, dimensionnement, réglage de `k`, et ce qu'on perd (rien) à se passer
+  de la formule.
+- `RESULTATS_morphing.md` — morphing et booléens, avec la vérification
+  quantitative, et le contrôle de la figure de courbure contre l'article.
 
 ## Notes
 
@@ -87,5 +99,12 @@ ignoré par git.
   Kuchel et al. 2021, lisse partout). Le second est préférable dès qu'on touche
   aux dérivées : les dérivées secondes du premier divergent au bord
   (voir `RESULTATS_courbures.md`, section 6).
+- **Comparer deux variantes se fait sur CPU, pas sur MPS**, et sur plusieurs
+  graines. C'est ce que fait `main_cloud.py` : trois graines, l'écart-type entre
+  graines servant d'étalon pour juger si un écart mesuré veut dire quelque chose.
+- **Le morphing n'est pas invariant par changement d'échelle des champs.**
+  `csg.normalized` divise chaque champ par la médiane de `‖∇f‖` sur sa surface
+  avant de l'interpoler — sans quoi le chemin est tiré vers le champ de plus
+  forte pente. La surface `f = 0` n'en est pas déplacée.
 - `main.py` enregistre un PNG au lieu de l'affichage interactif `%matplotlib
   ipympl` du notebook (pas besoin d'écran).

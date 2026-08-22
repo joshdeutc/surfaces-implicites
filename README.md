@@ -88,7 +88,18 @@ quartique ; l'ajustement polynomial la retrouve à 5e-7 près, contre 197 886 po
 pour le réseau. C'est l'argument de compression et d'explicabilité que Florian
 recommandait.
 
-**Ce qui reste.** Le dedans/dehors depuis un vrai nuage de points, le morphing et
-les opérations booléennes, la robustesse au bruit, le spatio-temporel — et
-surtout brancher les vraies données du BMBI, qui n'ont pas encore été fournies.
-Le détail et l'ordre sont dans `Code/PLAN.md`.
+**La chaîne « données réelles » est prête.** On sait apprendre une surface à
+partir d'un simple fichier de nuage de points orienté, sans jamais aucune
+formule — c'est ce qui s'appliquera aux capsules du BMBI. Le signe dedans/dehors
+déduit du nuage est exact à 100 % dès qu'on s'éloigne un peu de la surface, et
+l'entraînement qui s'en sert vaut celui qui triche avec la formule : l'écart
+entre les deux est plus petit que la dispersion entre deux graines.
+
+**Le morphing et les opérations booléennes marchent**, sur formules comme sur
+champs appris, avec une vérification quantitative (l'identité
+`V(A∪B) + V(A∩B) = V(A) + V(B)` tombe à 1.1e-06 % près).
+
+**Ce qui reste.** Le spatio-temporel — le cœur du sujet — la robustesse au bruit
+et aux vues partielles, les familles de formes à code latent, et surtout
+brancher les vraies données du BMBI, qui n'ont pas encore été fournies. Le
+détail et l'ordre sont dans `Code/PLAN.md`.
