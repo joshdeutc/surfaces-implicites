@@ -320,6 +320,26 @@ def main():
     print("  Ses dérivées SECONDES y divergent : la formule analytique du dépôt")
     print("  est inutilisable pour de l'analyse différentielle.")
 
+    # --- 2bis. La même forme, mais par une formule LISSE ----------------
+    print("\n" + "=" * 78)
+    print("2 bis. CONTRE-ÉPREUVE — le globule par sa QUARTIQUE (Kuchel)")
+    print("=" * 78)
+    print("  Même objet géométrique, mais décrit par un polynôme de degré 4")
+    print("  lisse partout, au lieu d'une formule définie par morceaux.")
+    print("  Si le diagnostic ci-dessus est juste, l'intégrale doit redevenir 4π.")
+    try:
+        from src.shapes import implicit_rbc_unit
+        xq, yq, zq, vq = grid_values_numpy(implicit_rbc_unit, 1.3, GRID_RES)
+        v_q, f_q, _, _ = extract_surface(xq, yq, zq, vq)
+        c_q = curvature_numpy(implicit_rbc_unit, v_q)
+        bilans["globule quartique"] = bilan_maillage(
+            v_q, f_q, c_q["K_gauss"], "globule quartique (analytique, lisse)")
+        print("  NB : la quartique n'est PAS une distance signée (‖∇F‖ ≠ 1).")
+        print("  Que le résultat soit juste quand même vérifie au passage que les")
+        print("  formules de courbure sont bien invariantes par reparamétrage de f.")
+    except ImportError:
+        print("  (implicit_rbc_unit pas encore disponible — cas ignoré)")
+
     # --- 3. Le résultat : le globule appris ----------------------------
     print("\n" + "=" * 78)
     print("3. RÉSULTAT — globule rouge appris par le réseau")
