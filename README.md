@@ -29,7 +29,9 @@ TZ2_Surfaces_Implicites_Neuronales/
 └── Code/                le code sérieux
     ├── README.md          structure des modules et liste des scripts
     ├── PLAN.md            feuille de route et journal d'avancement
-    ├── RESULTATS_courbures.md   journal détaillé du travail sur les courbures
+    ├── RESULTATS_courbures.md   courbures, invariants, Gauss-Bonnet
+    ├── RESULTATS_nuage.md       apprendre depuis un nuage de points seul
+    ├── RESULTATS_morphing.md    morphing, booléens, contrôle de la courbure
     ├── src/               les modules (formes, données, réseaux, géométrie, métriques)
     ├── main_*.py          un script par sujet d'étude
     ├── validate_geometry.py     les vérifications des outils géométriques
