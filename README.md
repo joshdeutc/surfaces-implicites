@@ -11,48 +11,84 @@ On veut représenter une surface fermée 3D par une équation implicite f(x,y,z)
 mais au lieu de connaître f à l'avance, on l'apprend avec un réseau de neurones à
 partir de points (dedans / dehors / sur la surface). Ensuite on reconstruit la
 surface avec du marching cubes. Le but final, c'est d'appliquer ça aux capsules
-déformables du BMBI, et si on a le temps, à des formes qui bougent dans le temps.
+déformables du BMBI, et de « condenser la forme mobile en une surface implicite
+espace-temps » — c'est la formulation de la fiche d'enregistrement.
 
-Tout le "pourquoi" et les directions de travail sont dans les mails de Florian
+Tout le « pourquoi » et les directions de travail sont dans les mails de Florian
 (dossier `Encadrement/`), en particulier celui avec ses recommandations.
 
 ## Comment le dossier est rangé
 
-- `Encadrement/` — la fiche d'enregistrement de la TZ et les deux mails de Florian.
-  Commence par là si tu veux comprendre ce qu'on doit faire et dans quel esprit.
-  Le mail "recommandations" est le plus important (données volumiques, SDF,
-  l'idée du polynôme, le morphing, les surfaces qui évoluent dans le temps).
+```
+TZ2_Surfaces_Implicites_Neuronales/
+├── README.md            ce fichier — le point d'entrée
+├── Encadrement/         la fiche d'enregistrement de la TZ + les 2 mails de Florian
+├── Articles/            la biblio en PDF (DeepSDF, Occupancy Networks, RBC Kuchel)
+├── Notebooks/           les notebooks du début, simples à lancer pour visualiser
+├── Données/             vide — en attente des capsules du BMBI
+└── Code/                le code sérieux
+    ├── README.md          structure des modules et liste des scripts
+    ├── PLAN.md            feuille de route et journal d'avancement
+    ├── RESULTATS_courbures.md   journal détaillé du travail sur les courbures
+    ├── src/               les modules (formes, données, réseaux, géométrie, métriques)
+    ├── main_*.py          un script par sujet d'étude
+    ├── validate_geometry.py     les vérifications des outils géométriques
+    └── output/            figures et modèles produits (ignoré par git)
+```
 
-- `Articles/` — la biblio en PDF. Les deux articles de fond sont DeepSDF (2019) et
-  Occupancy Networks (2019) ; il y a aussi l'article Nature Comm 2021 sur le
-  globule rouge qui sert pour la forme biconcave.
+- `Encadrement/` — **commence par là** pour comprendre ce qu'on doit faire et dans
+  quel esprit. Le mail « recommandations » est le plus important (données
+  volumiques, SDF, l'idée du polynôme, le morphing, les surfaces qui évoluent
+  dans le temps). La fiche d'enregistrement donne le programme officiel en heures.
 
-- `Notebooks/` — les notebooks du début, simples à lancer pour visualiser :
-  la gyroïde, le globule rouge analytique, et le premier apprentissage sur une
-  sphère / un ellipsoïde. C'est le bon endroit pour se faire la main.
+- `Articles/` — les deux articles de fond sont DeepSDF (2019) et Occupancy
+  Networks (2019) ; l'article Nature Comm 2021 sur le globule rouge donne à la
+  fois l'équation quartique de la forme et les formules de courbure qu'on utilise.
 
-- `Code/` — là où on code sérieusement. C'est une version propre et découpée du
-  notebook d'apprentissage (dossier `src/`), avec la vraie loss (surface + signe
-  dedans/dehors + eikonal), le globule rouge, etc. Le détail et l'avancement sont
-  dans `Code/README.md` et `Code/PLAN.md`.
+- `Notebooks/` — la gyroïde, le globule rouge analytique, et le premier
+  apprentissage sur une sphère / un ellipsoïde. Le bon endroit pour se faire la main.
 
-- `Données/` — vide pour l'instant, c'est là qu'on mettra les données de capsules
+- `Code/` — la version propre et découpée, avec la vraie loss (surface +
+  dedans/dehors + eikonal), les métriques, la géométrie différentielle et
+  l'ajustement polynomial. Le détail est dans `Code/README.md` et `Code/PLAN.md`.
+
+- `Données/` — vide pour l'instant, c'est là qu'iront les données de capsules
   quand Florian nous les enverra.
 
 ## Par où commencer (si tu prends le train en route)
 
 1. Lis le mail de recommandations dans `Encadrement/`.
 2. Ouvre un notebook dans `Notebooks/` pour voir à quoi ça ressemble.
-3. Regarde `Code/README.md` puis lance `Code/main_eikonal.py` pour voir
-   l'apprentissage "réaliste" tourner.
+3. Regarde `Code/README.md`, puis lance `python Code/main_eikonal.py` pour voir
+   l'apprentissage « réaliste » tourner (environ 40 secondes).
+4. Lance `python Code/validate_geometry.py` : 28 vérifications sur des cas dont
+   la réponse est connue d'avance. C'est le meilleur résumé de ce que le code
+   sait faire.
 
 ## Où on en est
 
-Le pipeline marching cubes + rendu marche bien. Pour l'apprentissage, on est
-passés d'une version "triche" (on donnait la vraie valeur de f) à une vraie loss
-façon DeepSDF (surface + dedans/dehors + eikonal), testée sur l'ellipsoïde et le
-globule rouge et ça reconstruit bien.
+**Ce qui marche.** Le pipeline complet points → réseau → marching cubes → figure,
+avec une loss réaliste : on n'utilise jamais la valeur exacte de f pour
+entraîner, seulement des points de surface, le signe dedans/dehors et la loi
+eikonal. Testé sur l'ellipsoïde et le globule rouge, reconstruction sous-voxel.
 
-Ce qui reste : les courbures du globule rouge, la dimension temporelle (le plan
-est déjà réfléchi mais pas encore codé) et surtout brancher les vraies données
-du BMBI.
+**Ce qu'on sait mesurer.** Des métriques indépendantes de toute formule (Chamfer,
+IoU, Hausdorff, erreur eikonal) — donc transposables aux vraies capsules — et des
+invariants géométriques (Euler, aire, volume, Gauss-Bonnet) qui disent si l'on
+peut croire une surface reconstruite.
+
+**Le résultat le plus intéressant.** Le Chamfer teste la position de la surface,
+l'eikonal teste le gradient ; les courbures testent les dérivées secondes, et
+personne ne le fait d'habitude. Verdict : le réseau est juste à l'ordre 2
+globalement (Gauss-Bonnet à 0.02 % de 4π) mais il lisse les extrêmes de courbure
+d'environ 16 % — au centre du creux du globule il annonce 12.1 au lieu de 14.4.
+
+**Le globule rouge tient en 10 coefficients.** Son équation exacte est une
+quartique ; l'ajustement polynomial la retrouve à 5e-7 près, contre 197 886 poids
+pour le réseau. C'est l'argument de compression et d'explicabilité que Florian
+recommandait.
+
+**Ce qui reste.** Le dedans/dehors depuis un vrai nuage de points, le morphing et
+les opérations booléennes, la robustesse au bruit, le spatio-temporel — et
+surtout brancher les vraies données du BMBI, qui n'ont pas encore été fournies.
+Le détail et l'ordre sont dans `Code/PLAN.md`.

@@ -23,17 +23,24 @@ initiale, qui sert seulement à valider la machinerie).
 
 ## Feuille de route
 
-| Étape | Objectif | Touche |
-|------|----------|--------|
-| **1** | **Apprendre SANS la formule** : surface + dedans/dehors + eikonal | `data.py`, `train.py`, `model.py` |
-| 2 | Meilleures activations (SIREN / encodage de Fourier) | `model.py` |
-| 3 | Formes complexes — globule rouge biconcave (test des limites) | `shapes.py` |
-| 4 | Métriques quantitatives (Chamfer, IoU, erreur eikonal) | nouveau module |
-| 5 | Robustesse : bruit, points épars, vue partielle | `data.py` |
-| 6 | Famille de formes + code latent (lien réduction de modèle) | `model.py`, `train.py` |
-| 7 | Spatio-temporel `f(x,y,z,t)` + suivi d'un point (objectif final) | tout |
+| Étape | Objectif | Touche | État |
+|------|----------|--------|------|
+| **1** | **Apprendre SANS la formule** : surface + dedans/dehors + eikonal | `data.py`, `train.py`, `model.py` | fait |
+| 2 | Meilleures activations (Fourier ; SIREN reste à faire) | `model.py` | partiel |
+| 3 | Formes complexes — globule rouge biconcave (test des limites) | `shapes.py` | fait |
+| 4 | Métriques quantitatives SANS la formule (Chamfer, IoU, eikonal) | `metrics.py` | fait |
+| **5** | **Courbures et invariants géométriques** (article Kuchel 2021) | `curvature.py`, `invariants.py` | fait |
+| **6** | **Représentation polynomiale** de `f` (compression, explicabilité) | `polyfit.py` | fait |
+| 7 | Dedans/dehors depuis un vrai nuage de points (normales + produit scalaire) | `data.py` | à faire |
+| 8 | Morphing `θf₁+(1−θ)f₂` + union / intersection / différence | nouveau module | à faire |
+| 9 | Robustesse : bruit, points épars, vue partielle | `data.py` | à faire |
+| 10 | Famille de formes + code latent (lien réduction de modèle) | `model.py`, `train.py` | à faire |
+| 11 | Brancher les vraies données de capsules (sorties EF du BMBI) | nouveau module | bloqué |
+| 12 | Spatio-temporel `f(x,y,z,t)` + suivi d'un point (objectif final) | tout | à faire |
 
-Premier jalon visé : **1 + 2 + 3 + 4**.
+Les étapes 5 à 8 viennent des recommandations de F. De Vuyst (`Encadrement/`) et
+du programme de la fiche d'enregistrement : les courbures (10 h prévues), la
+piste polynomiale, le morphing, et la détermination réelle du dedans/dehors.
 
 ---
 
@@ -87,7 +94,53 @@ Perte = somme de termes (méthode IGR, Gropp et al. 2020) :
       (3) Fourier/SIREN exigent une régularisation soignée (moins de fréquences,
       poids eikonal plus fort, init adaptée) — pas plug-and-play.
 
-## GPU / Colab
-- Code rendu device-aware (src/device.py) ; notebook colab.ipynb prêt.
-- Ce PC : pas de GPU CUDA (Intel UHD + torch CPU-only) → ~0,5-1 s/epoch,
-  throttling thermique. Un T4 (Colab) ramènerait les runs de ~1 h à quelques min.
+- [x] Étape 4 — **métriques sans la formule** (`src/metrics.py`). Chamfer
+      symétrique + Hausdorff, IoU d'occupation par Monte-Carlo (protocole
+      Occupancy Networks), cohérence des normales, erreur eikonal. Aucune ne
+      demande la valeur exacte de `f` : toutes sont transposables aux vraies
+      capsules. Validées sur des cas dont la réponse est connue d'avance
+      (IoU sphère R=1 contre R=1.1 = 0.751 = rapport des volumes).
+
+- [x] Étape 5 — **courbures et invariants** (`src/curvature.py`,
+      `src/invariants.py`, `main_curvature.py`, `validate_geometry.py`).
+      Formules de Goldman/Kuchel appliquées au champ appris par autograd
+      d'ordre 2. Outils validés par 28 vérifications, dont le tore
+      (`χ = 0` et `∫K dA = 0` alors que `∫|K| dA = 25.1`).
+      RÉSULTAT : le réseau est juste à l'ordre 2 **globalement** —
+      `∫K dA = 12.5633` contre `4π = 12.5664`, soit 0.02 % d'écart — mais il
+      **lisse les extrêmes** : localement l'erreur sur K_gauss est de 7.5 % de
+      l'amplitude, et au centre du creux il annonce 12.1 au lieu de 14.4.
+      Corrélation avec la courbure exacte : 0.996. Détail dans
+      `RESULTATS_courbures.md`.
+
+- [x] Étape 6 — **représentation polynomiale** (`src/polyfit.py`, `main_poly.py`).
+      Ajustement algébrique par SVD sur le seul nuage de surface, sans réseau et
+      sans la formule. Résultats :
+        * ellipsoïde, degré 2 → 10 coefficients dont 4 non nuls, IoU = 1.0000
+        * globule rouge quartique, degré 4 → 10 coefficients non nuls,
+          IoU = 1.0000, coefficients retrouvés à 5e-7 près des vrais P, Q, R
+        * globule d'Evans-Fung, degré 4 → IoU = 0.666 ; il faut le degré 6
+      La conclusion antérieure « le globule demande le degré 6 » était un
+      artefact du profil d'Evans-Fung, qui n'est pas algébrique. Le vrai globule
+      rouge **est** une quartique : 10 coefficients contre 197 886 poids pour
+      IGRNet, soit un facteur 19 789.
+
+### Défaut trouvé et corrigé
+La formule `implicit_biconcave` (profil d'Evans-Fung, `np.where(r < 1, ...)`) a
+des dérivées secondes qui divergent au bord : Gauss-Bonnet y donne −2.6e8 au lieu
+de 4π. Ce n'est pas un échec de la méthode mais de la formule. La quartique de
+Kuchel, lisse partout, ramène l'intégrale à 12.5586. C'est l'argument le plus
+direct pour lui substituer une forme algébrique.
+
+### Reproductibilité — attention
+La graine fixe ne suffit pas sur GPU Apple : deux entraînements identiques
+divergent sur MPS (vérifié sur l'empreinte des poids), alors qu'ils sont
+identiques au bit près sur CPU. `mean|f_exact|` varie entre 0.0040 et 0.0079
+d'un run à l'autre sur `main_eikonal.py`. Un écart isolé de cet ordre ne prouve
+rien : forcer le CPU ou moyenner sur plusieurs runs pour comparer deux variantes.
+
+## Matériel
+- Code device-aware (`src/device.py`) : CUDA, sinon MPS (Apple), sinon CPU.
+- Machine actuelle : MacBook M2, MPS actif. Un entraînement complet prend 20 à
+  80 s ; l'ensemble des scripts tourne en quelques minutes. Le notebook
+  `colab.ipynb` reste disponible pour un GPU distant.
