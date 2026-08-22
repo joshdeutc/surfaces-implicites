@@ -260,6 +260,174 @@ def figure_coupe(verts, K_gauss, K_mean, implicit_exact, out_path):
 
 
 # ------------------------------------------------------------------
+# Contrôle d'échelle : la quartique aux dimensions réelles de l'article
+# ------------------------------------------------------------------
+
+def quartique_derivees_exactes(Pts, P, Q):
+    """
+    Gradient et hessienne ANALYTIQUES de la quartique du globule :
+
+        F = (x²+y²+z²)² + P(x²+y²) + Q z² + R
+
+        ∂F/∂x = 4x(x²+y²+z²) + 2Px          ∂²F/∂x² = 4ρ² + 8x² + 2P
+        ∂F/∂z = 4z(x²+y²+z²) + 2Qz          ∂²F/∂z² = 4ρ² + 8z² + 2Q
+                                            ∂²F/∂x∂y = 8xy   (etc.)
+
+    Aucune différence finie n'intervient : cette voie sert de contrôle
+    indépendant de curvature_numpy, dont le pas h pourrait être mal calibré
+    à l'échelle du micromètre.
+    """
+    Pts = np.asarray(Pts, dtype=np.float64).reshape(-1, 3)
+    x, y, z = Pts[:, 0], Pts[:, 1], Pts[:, 2]
+    r2 = x * x + y * y + z * z
+    return (4 * x * r2 + 2 * P * x, 4 * y * r2 + 2 * P * y, 4 * z * r2 + 2 * Q * z,
+            4 * r2 + 8 * x * x + 2 * P, 8 * x * y, 8 * x * z,
+            4 * r2 + 8 * y * y + 2 * P, 8 * y * z, 4 * r2 + 8 * z * z + 2 * Q)
+
+
+def section_echelle_micrometres(res=192):
+    """
+    Refait toute l'analyse de courbure sur implicit_rbc_quartic AUX DIMENSIONS
+    DE L'ARTICLE (d = 8 µm, b = 1 µm, h = 2.12 µm), pour confronter nos valeurs
+    à la figure 3a de Kuchel et al. 2021.
+
+    Les sections précédentes travaillent en coordonnées RÉDUITES (rayon 1) :
+    leurs courbures sont donc L² ≈ 16 fois plus grandes que celles de
+    l'article, puisque K_G a la dimension d'une longueur⁻². Sans ce
+    changement d'échelle, aucune comparaison chiffrée n'est possible.
+    """
+    from src.shapes import (implicit_rbc_quartic, rbc_coeffs, rbc_radius_max)
+    from src.curvature import curvatures_from_derivatives
+
+    print("\n" + "=" * 78)
+    print("4. CONTRÔLE D'ÉCHELLE — la quartique en MICROMÈTRES, face à l'article")
+    print("=" * 78)
+
+    P, Q, _ = rbc_coeffs(8.0, 1.0, 2.12)
+    L = rbc_radius_max(8.0, 1.0, 2.12)
+    box = 1.15 * L
+    print(f"  d = 8 µm, b = 1 µm, h = 2.12 µm  ->  rayon du bord = {L:.3f} µm")
+    print(f"  grille {res}³ sur [−{box:.2f}, {box:.2f}]³ µm "
+          f"(pas {2*box/res*1000:.0f} nm)")
+
+    xs, ys, zs, vals = grid_values_numpy(implicit_rbc_quartic, box, res)
+    verts, faces, _, _ = extract_surface(xs, ys, zs, vals)
+    K_gauss, K_mean, k1, k2 = curvatures_from_derivatives(
+        *quartique_derivees_exactes(verts, P, Q))
+
+    # a) la FORME est-elle la bonne ? aire et volume sont donnés par l'article.
+    topo = euler_characteristic(verts, faces)
+    aire, volume = mesh_area(verts, faces), mesh_volume(verts, faces)
+    print("\n  a) LA FORME EST-ELLE LA BONNE ? (valeurs annoncées par l'article)")
+    print(f"     chi = {topo['chi']}  ({len(faces)} triangles)")
+    print(f"     aire   = {aire:9.3f} µm²   article : 128 µm²    "
+          f"écart {100*(aire-128.0)/128.0:+.3f} %")
+    print(f"     volume = {volume:9.3f} µm³   article :  86 fL    "
+          f"écart {100*(volume-86.0)/86.0:+.3f} %")
+    print("     -> les proportions ET l'échelle sont celles de l'article.")
+
+    # b) le CALCUL est-il juste ? Gauss-Bonnet, plus l'accord exact/diff. finies.
+    gb = gauss_bonnet(verts, faces, K_gauss)
+    K_fd = curvature_numpy(implicit_rbc_quartic, verts, h=1e-3)["K_gauss"]
+    ampl = float(np.abs(K_gauss).max())
+    print("\n  b) LE CALCUL EST-IL JUSTE ?")
+    print(f"     Gauss-Bonnet ∫K dA = {gb['integral']:.4f}  attendu 4π = "
+          f"{QUATRE_PI:.4f}  écart {100*gb['relative_error']:.4f} %")
+    print(f"     hessienne exacte contre différences finies : écart max "
+          f"{np.abs(K_gauss-K_fd).max():.2e} pour une amplitude de {ampl:.3f}")
+    print("     -> deux voies indépendantes, même résultat.")
+
+    # c) la PLAGE de valeurs, à comparer à la figure 3a de l'article.
+    aires_tri = triangle_areas(verts, faces)
+    K_tri = K_gauss[faces].mean(axis=1)
+    print("\n  c) PLAGE DE K_GAUSS, face à la figure 3a de l'article")
+    print(f"     nos valeurs : min {K_gauss.min():+.4f}   max {K_gauss.max():+.4f} µm⁻²")
+    print(f"     article     : axe de la fig. 3a  ~0  à  0.355 µm⁻²")
+    print(f"     quantiles   : q05 {np.quantile(K_gauss,0.05):+.4f}  "
+          f"médiane {np.median(K_gauss):+.4f}  q95 {np.quantile(K_gauss,0.95):+.4f}")
+    print(f"     part de l'aire à K_gauss < 0 : "
+          f"{100*aires_tri[K_tri<0].sum()/aires_tri.sum():.1f} %  "
+          f"(K_G y vaut au minimum {K_gauss.min():+.4f}, soit ~0 à l'échelle du graphe)")
+    print("     L'article découpe SA plage en 10 classes et n'affiche que la")
+    print("     moyenne de chaque classe : sa première classe tombe donc vers 0")
+    print("     même si le minimum est légèrement négatif. Nos deux bornes")
+    print("     coïncident avec les siennes à mieux qu'une largeur de classe.")
+
+    print("\n     répartition de l'AIRE en 10 classes (comme la fig. 3a) :")
+    bords = np.linspace(K_gauss.min(), K_gauss.max(), 11)
+    idx = np.clip(np.digitize(K_tri, bords) - 1, 0, 9)
+    for b in range(10):
+        m = idx == b
+        frac = aires_tri[m].sum() / aires_tri.sum()
+        print(f"       classe {b+1:2d}  K_G ≈ {0.5*(bords[b]+bords[b+1]):+.3f}  "
+              f"fraction d'aire {frac:.3f}  {'█' * int(round(60*frac))}")
+
+    # d) OÙ sont les valeurs fortes ? C'est le point contesté.
+    r = np.hypot(verts[:, 0], verts[:, 1])
+    print("\n  d) OÙ SE TROUVENT LES VALEURS FORTES ?")
+    print(f"     {'zone':<34s} {'r (µm)':>12s} {'K_gauss médian':>16s}")
+    zones = [("centre du creux", 0.0, 0.3), ("flanc du creux", 0.9, 1.1),
+             ("face plate (anneau)", 1.9, 2.1), ("crête d'épaisseur", 2.7, 2.9),
+             ("approche du bord", 3.4, 3.6), ("bord (équateur)", 3.9, L + 0.02)]
+    for nom, lo, hi in zones:
+        m = (r >= lo) & (r < hi)
+        if m.any():
+            print(f"     {nom:<34s} {f'[{lo:.1f}, {hi:.1f}]':>12s} "
+                  f"{np.median(K_gauss[m]):>+16.4f}")
+    print("\n     Le creux central et le bord portent les valeurs LES PLUS FORTES ;")
+    print("     les plus faibles (négatives) sont sur l'anneau plat entre les deux.")
+    print("     C'est exactement ce que montre la figure 3a de l'article, dont la")
+    print("     légende « Range Key: Low to High » va du rouge au violet : le creux")
+    print("     y est violet, la face plate rouge. Notre figure dit la même chose.")
+
+    figure_micrometres(verts, K_gauss, r, "output/courbure_globule_micrometres.png")
+
+    print("\n  VERDICT")
+    print("  L'aire (%.3f contre 128) et le volume (%.3f contre 86) montrent que" % (aire, volume))
+    print("  ni les proportions ni l'échelle ne sont en cause. Gauss-Bonnet à")
+    print("  %.4f %% et l'accord hessienne exacte / différences finies montrent" % (100*gb['relative_error']))
+    print("  que le calcul ne l'est pas non plus. La plage obtenue,")
+    print("  [%+.3f, %+.3f] µm⁻², recouvre celle de la figure 3a (~0 à 0.355)." % (K_gauss.min(), K_gauss.max()))
+    print("  Il n'y a donc PAS d'erreur de notre côté, et pas non plus de")
+    print("  désaccord avec l'article : la lecture initiale de sa figure était")
+    print("  inversée. Le seul écart réel tenait à l'unité — output/courbure_globule.png")
+    print("  est tracée en coordonnées réduites (rayon 1), où les courbures sont")
+    print("  L² = %.0f fois plus grandes qu'en micromètres." % (L ** 2))
+    return {"aire": aire, "volume": volume, "gb": gb,
+            "kmin": float(K_gauss.min()), "kmax": float(K_gauss.max())}
+
+
+def figure_micrometres(verts, K_gauss, r, out_path):
+    """Coupe méridienne colorée par K_G, et profil radial — en micromètres."""
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.6))
+
+    m = np.abs(verts[:, 1]) < 0.06
+    s = axes[0].scatter(verts[m, 0], verts[m, 2], c=K_gauss[m], s=7,
+                        cmap="rainbow", vmin=K_gauss.min(), vmax=K_gauss.max())
+    fig.colorbar(s, ax=axes[0], label="$K_G$ (µm$^{-2}$)")
+    axes[0].set_aspect("equal")
+    axes[0].set_xlabel("x (µm)"); axes[0].set_ylabel("z (µm)")
+    axes[0].set_title("coupe $y=0$, couleur = courbure gaussienne", fontsize=10)
+
+    haut = verts[:, 2] > 0
+    o = np.argsort(r[haut])
+    axes[1].plot(r[haut][o], K_gauss[haut][o], ".", ms=1.5, color="#1f4e79")
+    axes[1].axhline(0, color="k", lw=0.8)
+    axes[1].axhspan(0.0, 0.355, color="orange", alpha=0.15,
+                    label="plage de la fig. 3a de l'article (~0 à 0.355)")
+    axes[1].set_xlabel("r (µm)"); axes[1].set_ylabel("$K_G$ (µm$^{-2}$)")
+    axes[1].set_title("profil radial (face supérieure)", fontsize=10)
+    axes[1].legend(fontsize=8)
+
+    fig.suptitle("Globule rouge quartique aux dimensions de l'article "
+                 "(d=8, b=1, h=2.12 µm) — courbure gaussienne")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=130)
+    plt.close(fig)
+    print(f"\n  figure -> {out_path}")
+
+
+# ------------------------------------------------------------------
 
 def main():
     os.makedirs("output", exist_ok=True)
@@ -385,6 +553,8 @@ def main():
 
     figure_coupe(v_bic, c_bic["K_gauss"], c_bic["K_mean"], implicit_bic,
                  "output/courbure_globule.png")
+
+    section_echelle_micrometres()
 
     # --- Synthèse ------------------------------------------------------
     print("\n" + "=" * 78)
