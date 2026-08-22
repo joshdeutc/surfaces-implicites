@@ -36,7 +36,13 @@ La figure reconstruite est écrite dans `output/surface.png`.
 
 ## Notes
 
-- Une graine aléatoire fixe (`set_seed`) est ajoutée par rapport au notebook
-  pour rendre les exécutions reproductibles.
+- Une graine aléatoire fixe (`set_seed`) est ajoutée par rapport au notebook.
+  ATTENTION : elle ne suffit PAS à rendre les exécutions reproductibles ici.
+  Sur GPU Apple (MPS), deux entraînements à graine identique divergent — vérifié
+  en comparant l'empreinte des poids après 300 époques. Sur CPU, ils sont
+  identiques au bit près. Conséquence pratique : `main_eikonal.py` donne un
+  `mean|f_exact|` qui varie d'un run à l'autre entre 0.0040 et 0.0079. Pour
+  comparer deux variantes de code, il faut soit forcer le CPU, soit moyenner
+  sur plusieurs runs — un écart isolé de cet ordre ne prouve rien.
 - `main.py` enregistre une image PNG au lieu de l'affichage interactif
   `%matplotlib ipympl` du notebook (pas besoin d'écran).
