@@ -205,7 +205,8 @@ def curvature_autograd(model, points, device=None, chunk=4096, verbose=True):
             block = torch.tensor(P[start:start + chunk], dtype=torch.float32,
                                  device=dev, requires_grad=True)
             g, H = _hessian_autograd(m, block)
-            outs.append((g.double().cpu().numpy(), H.double().cpu().numpy()))
+            # Rapatrier AVANT de passer en double : MPS ne gère pas le float64.
+            outs.append((g.cpu().double().numpy(), H.cpu().double().numpy()))
         g = np.concatenate([o[0] for o in outs], axis=0)
         H = np.concatenate([o[1] for o in outs], axis=0)
         return g, H
@@ -213,7 +214,7 @@ def curvature_autograd(model, points, device=None, chunk=4096, verbose=True):
     used = device
     try:
         g, H = compute_on(device)
-    except (RuntimeError, NotImplementedError) as err:
+    except (RuntimeError, NotImplementedError, TypeError) as err:
         if device.type == "cpu":
             raise
         if verbose:
