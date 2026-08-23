@@ -139,6 +139,19 @@ la topologie est correcte aux onze instants.
 **Le réseau restitue des instants qu'on ne lui a jamais montrés, aussi bien que
 ceux qu'il a vus.** Il a condensé la séquence en un champ continu.
 
+![Ce qu'on donne au réseau et ce qu'il produit](figures/temporel_donnees_vs_appris.png)
+
+*Ligne du haut : les données fournies. Ligne du bas : en bleu la surface apprise,
+en tirets rouges la vraie surface. Les cinq colonnes encadrées de rouge n'ont
+jamais été montrées au réseau.*
+
+Les surfaces sont bien des objets 3D — la coupe méridienne ci-dessus n'est qu'une
+vue commode pour une surface de révolution :
+
+![Les surfaces reconstruites en 3D](figures/temporel_3d.png)
+
+![Le nuage 3D fourni et la surface apprise](figures/temporel_3d_nuage.png)
+
 ### Bloc 3 — conservation du volume
 
 Le volume exact vaut 1.343568 et ne dépend pas de `t` (det A = 1). Le marching
@@ -192,6 +205,8 @@ matière transporté par A(t)) s'écarte de la trajectoire normale exacte de 0.0
 Une surface implicite donne le mouvement de la **surface**, pas celui de la
 matière. C'est une limite de la représentation, à connaître avant de vouloir
 suivre un marqueur sur une vraie membrane.
+
+![Suivi lagrangien](figures/temporel_trajectoires.png)
 
 ## 5. Les contrôles — ce que ces chiffres ne prouvent pas
 
@@ -306,10 +321,13 @@ fois dans le programme de travail.
 
 ## 8. Figures
 
+Les figures ci-dessus sont dans `figures/` (suivies par git). Le script en produit
+d'autres dans `output/`, qui n'est pas versionné :
+
 | Fichier | Contenu |
 |---|---|
-| `output/temporel_donnees_vs_appris.png` | ce qu'on donne au réseau et ce qu'il produit, aux 11 instants |
-| `output/temporel_3d.png` | les surfaces reconstruites en 3D (≈ 27 000 triangles, χ = 2) |
-| `output/temporel_3d_nuage.png` | le nuage 3D orienté fourni, et la surface apprise par-dessus |
+| `figures/temporel_donnees_vs_appris.png` | ce qu'on donne au réseau et ce qu'il produit, aux 11 instants |
+| `figures/temporel_3d.png` | les surfaces reconstruites en 3D (≈ 27 000 triangles, χ = 2) |
+| `figures/temporel_3d_nuage.png` | le nuage 3D orienté fourni, et la surface apprise par-dessus |
+| `figures/temporel_trajectoires.png` | suivi lagrangien et écart au fil du temps |
 | `output/temporel_profils.png` | coupes méridiennes, appris contre vrai |
-| `output/temporel_trajectoires.png` | suivi lagrangien et écart au fil du temps |

@@ -36,7 +36,8 @@ initiale, qui sert seulement à valider la machinerie).
 | 9 | Robustesse : bruit, points épars, vue partielle | `data.py` | à faire |
 | 10 | Famille de formes + code latent (lien réduction de modèle) | `model.py`, `train.py` | à faire |
 | 11 | Brancher les vraies données de capsules (sorties EF du BMBI) | nouveau module | bloqué |
-| 12 | Spatio-temporel `f(x,y,z,t)` + suivi d'un point (objectif final) | tout | à faire |
+| **12** | **Spatio-temporel `f(x,y,z,t)` + suivi d'un point (objectif final)** | `temporal.py`, `model_temporal.py`, `train_temporal.py` | fait |
+| 13 | Affichage PyVista au format VTK (nommé deux fois dans la fiche) | nouveau module | à faire |
 
 Les étapes 5 à 8 viennent des recommandations de F. De Vuyst (`Encadrement/`) et
 du programme de la fiche d'enregistrement : les courbures (10 h prévues), la
@@ -175,6 +176,61 @@ Perte = somme de termes (méthode IGR, Gropp et al. 2020) :
           ce n'est pas le cas au bloc « champs appris », où la décroissance du
           volume est en partie imposée par les extrémités.
       Détail dans `RESULTATS_morphing.md`.
+
+- [x] Étape 12 — **surface implicite espace-temps** (`src/temporal.py`,
+      `src/model_temporal.py`, `src/train_temporal.py`, `main_temporal.py`).
+      C'est le « Graal » du mail et la formulation de la fiche : condenser une
+      forme mobile en un seul champ `f(x,y,z,t) = 0`. Protocole calqué sur ce que
+      rendra le code EF du BMBI — six fichiers `.npz` écrits sur disque, aux
+      instants t = 0, 0.2, 0.4, 0.6, 0.8, 1.0, et rien d'autre. Le globule
+      quartique est étiré à volume constant, `A(t) = diag(ξ^-1/2, ξ^-1/2, ξ)`
+      avec `det A = 1`, ξ de 1.0 à 1.5.
+        * **test central — les instants jamais vus** (t = 0.1, 0.3, 0.5, 0.7, 0.9,
+          aucun fichier fourni) : Chamfer **0.00815** contre 0.00814 aux instants
+          observés, IoU **0.99103** contre 0.99058, `χ = 2` aux onze instants.
+          Le réseau a condensé la séquence, il ne l'a pas mémorisée.
+        * **volume**, invariant que l'entraînement ignore : dispersion de
+          **0.041 %** sur toute la séquence (biais de −1.04 %, mais ce biais varie
+          d'un run à l'autre sur MPS — il est passé de +0.79 % à −1.04 % entre
+          deux entraînements de graine identique ; seule la dispersion est
+          interprétable).
+        * **suivi lagrangien** par la vitesse normale `v_n = −(∂f/∂t)/‖∇_x f‖`,
+          lue directement sur le réseau : après 200 pas de RK4 le point reste à
+          **0.0003** de la vraie membrane, et s'écarte de 0.0008 de la trajectoire
+          obtenue avec le champ exact. Le champ exact, lui, dérive de 0.00000 —
+          les dérivées analytiques et le schéma d'intégration sont donc hors de
+          cause.
+        * deux points de méthode. L'eikonal ne doit porter que sur le gradient
+          d'ESPACE : appliqué aux quatre composantes il exigerait
+          `‖∇_x f‖² = 1 − (∂f/∂t)²`, c'est-à-dire punirait le mouvement. Et le
+          terme eikonal doit être tiré à `t` CONTINU : c'est la seule pièce de la
+          perte qui contraint les instants intermédiaires, sans elle le test
+          d'interpolation ne mesurerait que le hasard de l'initialisation.
+        * **les contrôles nuancent le résultat, et c'est le plus instructif.**
+          Le Chamfer est SATURÉ par la grille (marching cubes sur le champ exact
+          donne déjà 0.00783 à 96³, le réseau 0.00815, soit 1.04×). Conséquence :
+          sur la POSITION de la surface, le réseau 4D fait **jeu égal** avec un
+          simple morphing entre les deux instants encadrants (0.00815 contre
+          0.00806). Notre déformation est affine, donc trop favorable à cet
+          étalon. Le gain réel est sur les DÉRIVÉES : erreur de **0.00134** sur la
+          vitesse normale contre **0.02928** pour le morphing, soit un facteur
+          **22**. Ce qu'apporte un champ `f(x,y,z,t)`, ce n'est pas de mieux
+          placer les points, c'est de posséder un champ de vitesse dérivable
+          partout.
+        * étalon « image gelée » (rendre l'instant observé le plus proche) :
+          0.01252, soit 1.53× l'erreur du réseau. L'amplitude totale du mouvement
+          vaut 0.10655 : le réseau se trompe de 7.7 % de ce qu'il doit restituer.
+      Zéro appel à la formule pendant la préparation des données ET pendant
+      l'entraînement, vérifié par compteur. Détail dans `RESULTATS_temporel.md`.
+
+      **Ce qu'il faudrait durcir.** La déformation est affine, monotone,
+      axisymétrique, sans bruit, à topologie constante — le contrôle 5.3 montre
+      que c'est trop facile. Par ordre d'utilité : (1) déformation NON AFFINE
+      (flexion, onde sur la membrane), qui casse l'étalon morphing et rendrait le
+      test d'interpolation discriminant ; (2) mouvement non monotone
+      (basculement, retour à une forme antérieure) ; (3) moins d'instants — la
+      question pratique pour le BMBI : à quelle fréquence le code EF doit-il
+      sauvegarder ? ; (4) bruit sur les points ; (5) changement de topologie.
 
 - [x] Contrôle de la figure de courbure. La distribution de `K_gauss` semblait
       contredire l'article de Kuchel. Vérification faite aux dimensions de

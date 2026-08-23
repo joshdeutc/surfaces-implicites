@@ -66,6 +66,9 @@ TZ2_Surfaces_Implicites_Neuronales/
 4. Lance `python Code/validate_geometry.py` : 28 vérifications sur des cas dont
    la réponse est connue d'avance. C'est le meilleur résumé de ce que le code
    sait faire.
+5. Si tu ne dois regarder qu'un seul résultat, c'est `Code/RESULTATS_temporel.md` :
+   c'est le cœur du sujet, et la figure y montre d'un coup d'œil ce que le réseau
+   a reçu et ce qu'il en a fait.
 
 ## Où on en est
 
@@ -101,7 +104,32 @@ entre les deux est plus petit que la dispersion entre deux graines.
 champs appris, avec une vérification quantitative (l'identité
 `V(A∪B) + V(A∩B) = V(A) + V(B)` tombe à 1.1e-06 % près).
 
-**Ce qui reste.** Le spatio-temporel — le cœur du sujet — la robustesse au bruit
-et aux vues partielles, les familles de formes à code latent, et surtout
-brancher les vraies données du BMBI, qui n'ont pas encore été fournies. Le
-détail et l'ordre sont dans `Code/PLAN.md`.
+**La surface qui évolue dans le temps — le cœur du sujet.** C'est ce que Florian
+appelle « le Graal » et ce que la fiche appelle « condenser la forme mobile en une
+surface implicite espace-temps ». Un **seul** réseau `f(x,y,z,t)` apprend toute une
+séquence à partir de **six instants écrits sur disque** — le format que rendra le
+code Éléments Finis du BMBI. On lui en cache **cinq** :
+
+![Ce qu'on donne au réseau et ce qu'il produit](Code/figures/temporel_donnees_vs_appris.png)
+
+Aux cinq instants qu'il n'a jamais vus, il reconstruit la surface **aussi bien**
+qu'aux instants observés : Chamfer 0.00815 contre 0.00814, IoU 99.10 % contre
+99.06 %, topologie correcte partout. Il conserve même un invariant qu'on ne lui a
+jamais donné — le volume ne dérive que de **0.041 %** sur toute la séquence. Et on
+peut lire sur lui la vitesse de la membrane : un point advecté par `v_n` reste à
+0.0003 de la vraie surface après 200 pas d'intégration.
+
+**Mais le contrôle est plus intéressant que le résultat.** Le Chamfer est saturé
+par la grille de reconstruction, si bien que sur la seule *position* de la surface,
+le réseau fait jeu égal avec un simple morphing entre les deux instants voisins.
+Notre déformation est affine, donc trop facile pour cette mesure. Le gain réel est
+sur les *dérivées* : sur la vitesse normale, le réseau est **22 fois** plus juste
+que le morphing. Ce qu'apporte une surface implicite espace-temps, ce n'est pas de
+mieux placer les points — c'est de posséder un champ de vitesse dérivable partout.
+
+**Ce qui reste.** Durcir le cas temporel — une déformation **non affine** est
+l'escalade la plus utile, puisque c'est elle qui rendrait le test d'interpolation
+discriminant. Ensuite : la robustesse au bruit et aux vues partielles, les familles
+de formes à code latent, l'affichage PyVista au format VTK (nommé deux fois dans la
+fiche), et surtout **brancher les vraies données du BMBI**, qui n'ont pas encore
+été fournies — `Données/` est vide. Le détail et l'ordre sont dans `Code/PLAN.md`.

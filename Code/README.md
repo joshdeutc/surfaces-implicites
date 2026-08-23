@@ -38,6 +38,12 @@ src/
   curvature.py    courbures gaussienne / moyenne / principales, en numpy
                   (différences finies) et en torch (autograd d'ordre 2)
   invariants.py   caractéristique d'Euler, aire, volume, Gauss-Bonnet
+  temporal.py     séquence d'instants discrets : déformation à volume constant,
+                  écriture des fichiers, et champ exact réservé à la MESURE
+  model_temporal.py  réseau f(x,y,z,t) : IGRNet à quatre entrées, initialisé
+                  indépendant du temps
+  train_temporal.py  perte espace-temps (eikonal SPATIAL, t continu) et
+                  dérivées ∇_x f, ∂f/∂t du champ appris
   visualize.py    figure 3D matplotlib (PNG)
   device.py       CUDA / MPS (Apple) / CPU
 ```
@@ -54,6 +60,7 @@ src/
 | `main_cloud.py` | chaîne complète depuis un fichier de nuage, sans aucune formule |
 | `main_morph.py` | morphing et booléens, sur formules et sur champs appris |
 | `main_curvature.py` | courbures du champ appris + contrôle Gauss-Bonnet |
+| `main_temporal.py` | **surface espace-temps** : un champ `f(x,y,z,t)` appris depuis six instants, testé sur cinq instants jamais vus |
 | `validate_geometry.py` | 28 vérifications des outils géométriques sur des cas connus |
 | `reconstruct_from_cache.py` | refait figure et métrique sans réentraîner |
 
@@ -83,6 +90,9 @@ ignoré par git.
   de la formule.
 - `RESULTATS_morphing.md` — morphing et booléens, avec la vérification
   quantitative, et le contrôle de la figure de courbure contre l'article.
+- `RESULTATS_temporel.md` — la surface qui évolue dans le temps : protocole,
+  test sur instants cachés, conservation du volume, suivi lagrangien, et les
+  contrôles qui disent ce que ces chiffres ne prouvent pas.
 
 ## Notes
 
@@ -106,5 +116,22 @@ ignoré par git.
   `csg.normalized` divise chaque champ par la médiane de `‖∇f‖` sur sa surface
   avant de l'interpoler — sans quoi le chemin est tiré vers le champ de plus
   forte pente. La surface `f = 0` n'en est pas déplacée.
+- **L'eikonal d'un champ espace-temps ne porte QUE sur le gradient d'espace.**
+  Le réseau `f(x,y,z,t)` a quatre dérivées partielles, mais `‖∇f‖ = 1` décrit une
+  distance signée DANS L'ESPACE. Appliquer la condition aux quatre composantes
+  reviendrait à exiger `‖∇_x f‖² = 1 − (∂f/∂t)²`, c'est-à-dire à demander au champ
+  d'être d'autant moins une distance signée qu'il bouge vite. D'où `grad[..., :3]`
+  partout dans `src/train_temporal.py`.
+- **Le terme eikonal se tire à `t` continu**, pas seulement aux instants observés.
+  C'est la seule pièce de la perte qui contraint le champ entre deux instants ;
+  sans elle, rien n'y impose quoi que ce soit et le test d'interpolation ne
+  mesurerait que le hasard de l'initialisation.
+- **Le Chamfer sature.** À la grille 96³, le marching cubes appliqué au champ
+  EXACT donne déjà 0.0078 : en dessous, aucun réseau ne peut descendre. Un
+  Chamfer de 0.008 signifie « aussi bon que la grille le permet » et ne peut pas
+  départager deux méthodes proches. Pour comparer deux méthodes, prendre une
+  mesure qui ne sature pas — le volume ou la vitesse normale.
 - `main.py` enregistre un PNG au lieu de l'affichage interactif `%matplotlib
   ipympl` du notebook (pas besoin d'écran).
+- Les figures de `output/` ne sont pas versionnées. Celles qui servent à la
+  documentation sont recopiées dans `figures/`, qui l'est.
