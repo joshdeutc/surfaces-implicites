@@ -184,6 +184,19 @@ indiscernables, ce qui est précisément le résultat recherché.
 de deux très petits nombres, donc fragile. La formulation robuste est celle de la
 colonne de droite : **le réseau est à 0.16 % du plancher, le morphing à 5.2 %.**
 
+*Et le « plancher » n'est pas une borne stricte.* Instant par instant, le Chamfer
+du réseau passe parfois SOUS celui du champ de référence — de quelques unités de
+la cinquième décimale (0.00459 à 0.00474 pour l'un comme pour l'autre). C'est
+normal : les deux sont des maillages de marching cubes comparés à un nuage
+échantillonné, et rien n'impose que celui issu de la référence soit le plus
+proche à chaque instant. La bonne conclusion n'est donc pas « le réseau atteint
+le plancher » au sens d'une borne franchie, mais **« le réseau et le plancher
+sont indiscernables au bruit de grille près »** — ce qui est exactement ce qu'on
+cherchait à établir, et c'est visible sur la figure des diagnostics, où les
+instants cachés (points rouges) sont noyés parmi les observés.
+
+![Instant par instant](figures/capsules_temporel_transitoire_diagnostics.png)
+
 Sur la vitesse normale :
 
 | | amplitude | réseau | morphing |
