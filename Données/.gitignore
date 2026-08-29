@@ -1,0 +1,5 @@
+# Données du BMBI — propriété du laboratoire, sous clause de confidentialité.
+# Rien de ce dossier ne doit partir sur un dépôt distant, même privé.
+*
+!.gitignore
+!README.md
