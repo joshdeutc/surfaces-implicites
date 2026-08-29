@@ -38,7 +38,7 @@ initiale, qui sert seulement à valider la machinerie).
 | **11** | **Brancher les vraies données de capsules (sorties EF du BMBI)** | `capsules.py` | **données reçues et analysées** |
 | **12** | **Spatio-temporel `f(x,y,z,t)` + suivi d'un point (objectif final)** | `temporal.py`, `model_temporal.py`, `train_temporal.py` | fait |
 | 13 | Affichage PyVista au format VTK (nommé deux fois dans la fiche) | `viz_pv.py` | fait |
-| **14** | **Apprendre `f(x,y,z,t)` SUR LA CAPSULE RÉELLE** — la campagne qui suit | `capsules.py`, `train_temporal.py` | à faire |
+| **14** | **Apprendre `f(x,y,z,t)` SUR LA CAPSULE RÉELLE** | `capsules.py`, `main_capsules_temporal.py` | **fait** |
 
 Les étapes 5 à 8 viennent des recommandations de F. De Vuyst (`Encadrement/`) et
 du programme de la fiche d'enregistrement : les courbures (10 h prévues), la
@@ -305,29 +305,72 @@ Perte = somme de termes (méthode IGR, Gropp et al. 2020) :
 
 ---
 
-## Étape 14 — la campagne qui suit : `f(x,y,z,t)` sur la capsule réelle
+## Étape 14 — `f(x,y,z,t)` sur la capsule réelle : fait
 
-Tout est en place : le format d'échange est écrit (`output/capsules_bmbi/`), la
-perte espace-temps existe, les métriques ne dépendent d'aucune formule. Ce qui
-change par rapport à la campagne synthétique, et qu'il faut traiter :
+Campagne dans `main_capsules_temporal.py`, journal dans
+`RESULTATS_capsules_temporel.md`. Fenêtre sur le transitoire (pas 0 à 4000),
+21 instants, un sur deux caché, deux échantillonnages comparés.
 
-1. **Réécrire le contrôle lagrangien.** Comparer `v_n` appris à `v_n` du maillage
-   (vitesse des nœuds projetée sur la normale), pas à la trajectoire des nœuds.
-   C'est le point de méthode le plus important, et il vient du tank-treading.
-2. **Refaire le test des instants cachés**, cette fois sur une déformation non
-   affine. C'est là que l'étalon morphing doit enfin perdre — s'il ne perd pas,
-   c'est un vrai résultat négatif et il faut le dire.
-3. **Choisir le régime temporel.** Première campagne sur le transitoire
-   (`instants_transitoire`), là où la forme bouge.
-4. **Le volume comme juge**, comme sur la séquence synthétique : la donnée le
-   conserve à 0.0256 %, le champ appris doit s'en approcher.
-5. **La question pratique pour le BMBI** : combien d'instants faut-il vraiment ?
-   On peut maintenant y répondre en chiffres, c'est-à-dire dire à quelle
-   fréquence leur code EF doit sauvegarder.
-6. **Les courbures sur une vraie membrane** — le creux du parachute est un
-   détail à forte courbure, exactement ce sur quoi le réseau lissait de 16 %.
+- [x] **Le contrôle lagrangien a été réécrit**, comme le tank-treading l'exigeait :
+      `v_n` appris contre `v_n` du MAILLAGE (vitesse des nœuds projetée sur la
+      normale), jamais contre une trajectoire de nœud.
+- [x] **Et il a fallu le réécrire une deuxième fois.** `v_n` du maillage est une
+      différence centrée : à un écart de 200 pas elle est fausse de 3 à 12 %.
+      Ramenée à 25 pas, où elle est stationnaire. Mesurer un champ appris contre
+      une référence fausse de 10 % n'aurait rien dit.
+- [x] **Vérité de référence sans formule** : `capsules.champ_reference`, distance
+      au plus proche point d'un nuage dense tiré sur les triangles, signe par
+      produit scalaire. Validée contre le test d'appartenance exact de trimesh :
+      **100.000 % d'accord** sur 20000 points. Elle donne aussi le PLANCHER du
+      Chamfer (marching cubes dessus : 0.00463 à la grille 96³).
 
-Ordre suggéré : 3 → 2 → 1 → 4 → 5 → 6.
+**Le résultat central.** Échantillonnage uniforme (un instant tous les 400 pas) :
+aux dix instants cachés, Chamfer 0.00500 contre 0.00533 au morphing et 0.00799 à
+l'image gelée. **Le réseau bat enfin le morphing** — ce que la séquence
+synthétique, affine, ne pouvait pas montrer. En excédent sur le plancher, la
+seule lecture honnête d'une métrique saturée : 1.9× mieux que le morphing.
+
+**Le résultat le plus utile.** À nombre d'instants ÉGAL, resserrer
+l'échantillonnage au début (là où la sphère se déforme) change tout :
+
+| aux instants cachés | uniforme | transitoire |
+|---|---:|---:|
+| Chamfer | 0.00500 | **0.00464** |
+| excédent sur le plancher | 0.00036 (7.8 % du plancher) | **0.0000074 (0.16 %)** |
+| IoU voxel | 99.251 % | **99.650 %** |
+| erreur sur `v_n` | 18.0 % de l'amplitude | **4.6 %** |
+
+Avec le bon échantillonnage, **le réseau est au plancher de la grille aux
+instants qu'il n'a jamais vus**, et observés / cachés sont indiscernables
+(0.004634 contre 0.004639). Le morphing, lui, reste à 5.2 % du plancher.
+
+**Ce qui est vraiment appris ici** : le placement des instants compte plus que
+leur nombre. C'est la réponse chiffrée à la question pratique du BMBI —
+sauvegarder proportionnellement à la vitesse de déformation, pas à intervalle
+constant. En uniforme, le réseau PERD contre le morphing au premier instant caché
+(pas 200, où l'amplitude de `v_n` vaut 8× le reste), parce qu'il n'a que deux
+photos pour couvrir la partie violente du mouvement.
+
+**Réserve.** La dispersion du volume n'est pas reproductible sur MPS : trois
+exécutions identiques du mode uniforme ont donné 0.055 %, 0.221 % et 0.462 %,
+alors que le Chamfer restait à 0.00500 aux trois. Seul son ordre de grandeur est
+interprétable.
+
+---
+
+## Ce qui reste, par ordre d'utilité
+
+1. **La fin de la séquence** (pas 4000 à 20000), non traitée : c'est une
+   relaxation lente, donc plus facile, mais c'est là qu'est le tank-treading pur.
+2. **L'extrapolation** : tous les instants cachés testés sont ENCADRÉS par des
+   instants observés. Rien n'a été demandé au-delà du dernier.
+3. **Étape 9 — robustesse** : bruit sur les points, vues partielles. Les capsules
+   sont une simulation, donc sans bruit de mesure.
+4. **Étape 10 — code latent** : une famille de capsules plutôt qu'une seule.
+5. **Moyenner sur plusieurs graines**, sur CPU, pour que la dispersion du volume
+   devienne interprétable.
+6. **Le rapport** (40 h prévues à la fiche) — pas commencé. Les six
+   `RESULTATS_*.md` en sont la matière.
 
 ### Défaut trouvé et corrigé
 La formule `implicit_biconcave` (profil d'Evans-Fung, `np.where(r < 1, ...)`) a

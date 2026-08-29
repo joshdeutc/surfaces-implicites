@@ -36,6 +36,7 @@ TZ2_Surfaces_Implicites_Neuronales/
     ├── RESULTATS_temporel.md    la surface espace-temps (le cœur du sujet)
     ├── RESULTATS_rendu_formes.md  rendu VTK, surfaces complexes, SIREN
     ├── RESULTATS_capsules.md    LES VRAIES DONNÉES DU BMBI
+    ├── RESULTATS_capsules_temporel.md  f(x,y,z,t) appris sur la vraie capsule
     ├── src/               les modules (formes, données, réseaux, géométrie, métriques)
     ├── main_*.py          un script par sujet d'étude
     ├── validate_geometry.py     les vérifications des outils géométriques
@@ -175,7 +176,38 @@ nœud — ce sont deux choses différentes. Ce n'est pas un défaut du champ imp
 une surface ne porte que son mouvement normal. C'est même un argument pour la
 représentation implicite, qui sépare d'office ce qu'un maillage lagrangien confond.
 
-**Ce qui reste.** Apprendre `f(x,y,z,t)` sur la capsule réelle — c'est l'étape 14
-de `Code/PLAN.md`, avec son ordre de marche. Puis la robustesse au bruit et aux
-vues partielles, et les familles de formes à code latent. Reste aussi la rédaction
-du rapport, qui n'est pas commencée.
+## Et le champ espace-temps tient sur les vraies données
+
+C'est l'objectif de la TZ, et il est atteint : **un seul réseau `f(x,y,z,t)`
+appris sur la capsule du BMBI reconstruit les instants qu'on lui a cachés.**
+Onze instants observés, dix cachés, rien d'autre. Détail dans
+`Code/RESULTATS_capsules_temporel.md`.
+
+![Ce qu'on donne au réseau et ce qu'il produit](Code/figures/capsules_temporel_transitoire_donnees.png)
+
+**Le réseau bat enfin les méthodes bêtes.** Sur la séquence synthétique, un simple
+morphing entre les deux instants voisins faisait jeu égal — parce que notre
+déformation était affine. Sur la vraie capsule, qui ne l'est pas, l'écart
+apparaît. Et la bonne lecture d'un Chamfer saturé par la grille, c'est l'excédent
+sur le plancher de discrétisation :
+
+| aux dix instants jamais vus | Chamfer | excédent sur le plancher | IoU |
+|---|---:|---:|---:|
+| image gelée | 0.00710 | 53 % du plancher | 97.28 % |
+| morphing entre encadrants | 0.00487 | 5.2 % | 99.17 % |
+| **réseau `f(x,y,z,t)`** | **0.00464** | **0.16 %** | **99.65 %** |
+
+Aux instants qu'il n'a jamais vus, **le réseau est au plancher de la grille** :
+0.004639 contre 0.004634 aux instants observés — les deux sont indiscernables.
+
+**Le résultat le plus utile pour le labo.** À nombre d'instants égal, les
+resserrer là où la forme bouge fait passer l'erreur sur la vitesse de la membrane
+de 18 % à 4.6 %, et l'excédent de Chamfer d'un facteur 50. Autrement dit :
+*le code Éléments Finis doit sauvegarder proportionnellement à la vitesse de
+déformation, pas à intervalle constant.* C'est une réponse chiffrée à une question
+qui était ouverte.
+
+**Ce qui reste.** La fin de la séquence (pas 4000 à 20000, la relaxation lente),
+l'extrapolation au-delà du dernier instant observé, la robustesse au bruit et aux
+vues partielles, les familles de formes à code latent. Et la rédaction du rapport,
+qui n'est pas commencée — mais les six `RESULTATS_*.md` en sont la matière.

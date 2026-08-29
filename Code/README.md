@@ -72,6 +72,7 @@ src/
 | `main_curvature.py` | courbures du champ appris + contrôle Gauss-Bonnet |
 | `main_temporal.py` | **surface espace-temps** : un champ `f(x,y,z,t)` appris depuis six instants, testé sur cinq instants jamais vus |
 | `main_capsules.py` | **les vraies données du BMBI** : carte d'identité du dataset, et ce qu'il change |
+| `main_capsules_temporal.py` | **`f(x,y,z,t)` appris sur la capsule réelle**, deux échantillonnages comparés |
 | `main_shapes.py` | surfaces complexes : topologie mesurée, puis apprentissage |
 | `main_siren.py` | comparaison Softplus / Fourier / SIREN, sans normales |
 | `main_render.py` | rendu PyVista et exports OBJ / VTK / VTP / PVD |
@@ -120,6 +121,9 @@ ignoré par git.
 - `RESULTATS_capsules.md` — **les vraies données du BMBI** : le maillage passe
   sans retouche, la déformation est prouvée non affine, 93 % du mouvement est
   tangentiel, et un contrôle du projet doit être réécrit.
+- `RESULTATS_capsules_temporel.md` — **la surface espace-temps sur la vraie
+  capsule** : le réseau bat enfin le morphing, et avec le bon échantillonnage il
+  atteint le plancher de la grille aux instants jamais vus.
 
 ## Notes
 

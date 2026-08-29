@@ -220,3 +220,87 @@ def exporter_sequence(dossier, faces, caps, indices, recentre=True,
              centres=np.asarray(centres, dtype=np.float64),
              box=np.float64(box))
     return fichiers, box
+
+
+# ------------------------------------------------------------------
+# Champ de référence : la « vérité » dont on dispose, tirée du maillage seul
+# ------------------------------------------------------------------
+
+def echantillon_surface(verts, faces, n=200000, seed=0):
+    """
+    Nuage dense tiré uniformément sur les triangles, avec la normale du triangle
+    d'origine. Sert de référence pour le Chamfer et de support au champ signé.
+
+    Le tirage est pondéré par l'aire des triangles, sans quoi les petits
+    triangles seraient sur-représentés.
+    """
+    rng = np.random.default_rng(seed)
+    v0, v1, v2 = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+    cr = np.cross(v1 - v0, v2 - v0)
+    aires = 0.5 * np.linalg.norm(cr, axis=1)
+    k = rng.choice(len(faces), size=n, p=aires / aires.sum())
+    u, v = rng.random(n), rng.random(n)
+    hors = u + v > 1.0
+    u[hors], v[hors] = 1.0 - u[hors], 1.0 - v[hors]
+    P = v0[k] + u[:, None] * (v1[k] - v0[k]) + v[:, None] * (v2[k] - v0[k])
+    Nn = cr[k] / np.maximum(np.linalg.norm(cr[k], axis=1, keepdims=True), 1e-300)
+    return P, Nn
+
+
+def champ_reference(verts, faces, box, grille=96, n_echantillons=60000, seed=0):
+    """
+    Distance signée approchée sur une grille, construite à partir du MAILLAGE
+    SEUL — aucune formule, donc utilisable sur des données réelles.
+
+    Distance : plus proche voisin dans un nuage dense tiré sur les triangles.
+    Signe : produit scalaire avec la normale du plus proche point, exactement la
+    règle de `src/inside_outside.py` et du mail de F. De Vuyst.
+
+    Sert à trois choses, toutes indispensables pour juger un champ appris sans
+    disposer de la vérité analytique :
+      - le PLANCHER du Chamfer (marching cubes sur ce champ : aucune méthode ne
+        peut faire mieux à cette grille) ;
+      - l'occupation de référence, donc l'IoU et le volume ;
+      - les étalons (image gelée, morphing), qui s'interpolent sur la grille.
+
+    Renvoie (axe, valeurs (grille,grille,grille)).
+    """
+    from scipy.spatial import cKDTree
+
+    S, Ns = echantillon_surface(verts, faces, n=n_echantillons, seed=seed)
+    ax = np.linspace(-box, box, grille)
+    X, Y, Z = np.meshgrid(ax, ax, ax, indexing="ij")
+    P = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
+
+    d, i = cKDTree(S).query(P, k=1, workers=-1)
+    signe = np.sign(np.einsum("ij,ij->i", P - S[i], Ns[i]))
+    signe[signe == 0] = 1.0
+    return ax, (signe * d).reshape(grille, grille, grille)
+
+
+def vitesse_normale_maillage(caps, faces, pas, dpas, dt_par_pas, recentre=True):
+    """
+    Vitesse NORMALE de la membrane, lue sur le maillage par différence centrée.
+
+    C'est le seul contrôle de vitesse valable sur ces données. Le mouvement des
+    nœuds est à 93 % TANGENTIEL (tank-treading) : comparer la trajectoire d'un
+    nœud à un point advecté par le champ appris n'a pas de sens, les deux ne
+    décrivent pas la même chose. En revanche la projection de la vitesse d'un
+    nœud sur la normale, elle, est bien la vitesse de la SURFACE — et c'est
+    exactement ce que porte un champ implicite.
+
+    `dt_par_pas` convertit un pas EF en unité du temps d'entraînement.
+
+    Renvoie (points, v_n) à l'instant `pas`.
+    """
+    if pas - dpas < 0 or pas + dpas > len(caps) - 1:
+        raise ValueError(
+            f"différence centrée impossible : pas={pas}, dpas={dpas} sort du "
+            f"tableau [0, {len(caps) - 1}]. Un indice négatif boucle "
+            "silencieusement en fin de séquence, d'où ce garde-fou.")
+    a = instant(caps, pas - dpas, recentre=recentre)[0]
+    b = instant(caps, pas + dpas, recentre=recentre)[0]
+    P = instant(caps, pas, recentre=recentre)[0]
+    vitesse = (b - a) / (2.0 * dpas * dt_par_pas)
+    n = vertex_normals(P, faces)
+    return P, np.einsum("ij,ij->i", vitesse, n)
