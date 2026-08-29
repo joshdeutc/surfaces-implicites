@@ -26,7 +26,7 @@ initiale, qui sert seulement à valider la machinerie).
 | Étape | Objectif | Touche | État |
 |------|----------|--------|------|
 | **1** | **Apprendre SANS la formule** : surface + dedans/dehors + eikonal | `data.py`, `train.py`, `model.py` | fait |
-| 2 | Meilleures activations (Fourier ; SIREN reste à faire) | `model.py` | partiel |
+| 2 | Meilleures activations (Fourier, SIREN) | `model.py`, `model_siren.py` | fait |
 | 3 | Formes complexes — globule rouge biconcave (test des limites) | `shapes.py` | fait |
 | 4 | Métriques quantitatives SANS la formule (Chamfer, IoU, eikonal) | `metrics.py` | fait |
 | **5** | **Courbures et invariants géométriques** (article Kuchel 2021) | `curvature.py`, `invariants.py` | fait |
@@ -35,13 +35,21 @@ initiale, qui sert seulement à valider la machinerie).
 | **8** | **Morphing `θf₁+(1−θ)f₂` + union / intersection / différence** | `csg.py` | fait |
 | 9 | Robustesse : bruit, points épars, vue partielle | `data.py` | à faire |
 | 10 | Famille de formes + code latent (lien réduction de modèle) | `model.py`, `train.py` | à faire |
-| 11 | Brancher les vraies données de capsules (sorties EF du BMBI) | nouveau module | bloqué |
+| **11** | **Brancher les vraies données de capsules (sorties EF du BMBI)** | `capsules.py` | **données reçues et analysées** |
 | **12** | **Spatio-temporel `f(x,y,z,t)` + suivi d'un point (objectif final)** | `temporal.py`, `model_temporal.py`, `train_temporal.py` | fait |
-| 13 | Affichage PyVista au format VTK (nommé deux fois dans la fiche) | nouveau module | à faire |
+| 13 | Affichage PyVista au format VTK (nommé deux fois dans la fiche) | `viz_pv.py` | fait |
+| **14** | **Apprendre `f(x,y,z,t)` SUR LA CAPSULE RÉELLE** — la campagne qui suit | `capsules.py`, `train_temporal.py` | à faire |
 
 Les étapes 5 à 8 viennent des recommandations de F. De Vuyst (`Encadrement/`) et
 du programme de la fiche d'enregistrement : les courbures (10 h prévues), la
 piste polynomiale, le morphing, et la détermination réelle du dedans/dehors.
+
+**26/08/2026 — l'étape 11 est débloquée.** F. De Vuyst a transmis le dataset de
+capsules (1.2 Go, confidentiel, `Données/` exclu de git). L'analyse est faite et
+documentée dans `RESULTATS_capsules.md` ; elle change l'ordre des priorités, voir
+la section « Étape 14 » plus bas. Le reste du travail se fait désormais sur les
+vraies données : c'est l'objet de la fiche d'enregistrement, et Florian évoque une
+publication en cas de succès.
 
 ---
 
@@ -225,7 +233,9 @@ Perte = somme de termes (méthode IGR, Gropp et al. 2020) :
 
       **Ce qu'il faudrait durcir.** La déformation est affine, monotone,
       axisymétrique, sans bruit, à topologie constante — le contrôle 5.3 montre
-      que c'est trop facile. Par ordre d'utilité : (1) déformation NON AFFINE
+      que c'est trop facile. → **Réglé le 26/08/2026 sans avoir à le fabriquer :
+      les vraies capsules sont non affines (15 % entre snapshots voisins) et
+      non monotones. Voir l'étape 11.** Par ordre d'utilité : (1) déformation NON AFFINE
       (flexion, onde sur la membrane), qui casse l'étalon morphing et rendrait le
       test d'interpolation discriminant ; (2) mouvement non monotone
       (basculement, retour à une forme antérieure) ; (3) moins d'instants — la
@@ -242,6 +252,82 @@ Perte = somme de termes (méthode IGR, Gropp et al. 2020) :
       Pas d'erreur de calcul : l'écart apparent venait des unités (coordonnées
       réduites contre micromètres, facteur 16). Figure comparable à l'article :
       `output/courbure_globule_micrometres.png`.
+
+- [x] Étape 13 — **rendu PyVista et formats d'échange** (`src/viz_pv.py`,
+      `main_render.py`). Rendu hors écran avec caméra déterministe et caméras
+      liées entre panneaux, champ scalaire aux sommets, export OBJ / VTK / VTP et
+      série temporelle `.pvd` lisible par ParaView. Chaque export est **relu et
+      recompté** : OBJ perd les champs scalaires, VTK et VTP les conservent.
+      Le lissage est à zéro par défaut — il déplace les sommets, donc fausse
+      toute aire, volume ou courbure mesurés après. Détail dans
+      `RESULTATS_rendu_formes.md`, section 1.
+
+- [x] Étape 3bis — **surfaces complexes**, le seul stress-test topologique du
+      projet (`src/shapes_complexes.py`, `main_shapes.py`). Chmutov, gyroïde,
+      Barth, metaballs, comme demandé par la fiche. Résultat inattendu :
+      **deux des quatre surfaces ne sont pas fermées**, et tout le pipeline
+      suppose un intérieur borné. Les metaballs donnent la démonstration la plus
+      directe de l'argument du sujet — mêmes boules, seuil différent, `χ` passe
+      de 0 à 2. Détail dans `RESULTATS_rendu_formes.md`, section 2.
+
+- [x] Étape 2 — **SIREN**, la troisième architecture (`src/model_siren.py`,
+      `main_siren.py`). Comparaison Softplus / Fourier / SIREN à ω₀ ∈ {10,15,30}
+      sur le globule biconcave, sans normales. Détail dans
+      `RESULTATS_rendu_formes.md`, section 3.
+
+- [x] Étape 11 — **LES VRAIES DONNÉES DU BMBI** (`src/capsules.py`,
+      `main_capsules.py`, `RESULTATS_capsules.md`). Dataset reçu le 26/08/2026 :
+      une capsule dans un canal, maillage triangulaire de 2562 nœuds matériels,
+      20001 pas de temps, 1.2 Go. **Confidentiel** : `Données/` est exclu de git.
+        * **le maillage entre dans la chaîne sans retouche** : χ = 2, étanche,
+          genre 0, volume signé positif donc normales déjà sortantes. Deux mois
+          de travail « à l'aveugle » sur le bon format.
+        * **la déformation est NON AFFINE, et prouvée telle.** 14.9 % de résidu
+          en moyenne entre snapshots voisins (contre 0 % sur notre séquence
+          synthétique). Et mieux qu'un pourcentage : la capsule part d'une sphère
+          et **cesse d'être convexe** dès le pas 1500 (défaut de convexité 1.06 à
+          1.61 %), or l'image affine d'un convexe est convexe. La limite n°1 du
+          projet tombe, et l'étalon morphing part avec 15 % d'erreur.
+        * **93 % du mouvement est TANGENTIEL** (tank-treading : la membrane
+          tourne autour d'une forme qui bouge peu). **Conséquence de protocole :
+          le bloc 4 de `RESULTATS_temporel.md` — advecter un point par `v_n` et
+          le comparer à la trajectoire d'un nœud — NE SE TRANSPOSE PAS.** Une
+          surface implicite ne porte que le mouvement normal, et c'est correct.
+          Il faut réécrire ce contrôle : `v_n` appris contre `v_n` du maillage.
+        * volume conservé à **0.0256 %**, aire étirée de 4.26 % : l'invariant
+          gratuit est là aussi.
+        * la capsule **migre** (centre de 0.400 à 0.046) : on sépare translation
+          et déformation (`recentre=True`), la trajectoire du centre étant une
+          fonction du temps à trois composantes, triviale à ajuster à part.
+        * échantillonnage : 101 instants uniformes = 0.51 arête entre voisins,
+          assez fin ; mais la déformation culmine au pas 800 et le reste est de
+          la relaxation, donc `instants_transitoire` resserre le début.
+
+---
+
+## Étape 14 — la campagne qui suit : `f(x,y,z,t)` sur la capsule réelle
+
+Tout est en place : le format d'échange est écrit (`output/capsules_bmbi/`), la
+perte espace-temps existe, les métriques ne dépendent d'aucune formule. Ce qui
+change par rapport à la campagne synthétique, et qu'il faut traiter :
+
+1. **Réécrire le contrôle lagrangien.** Comparer `v_n` appris à `v_n` du maillage
+   (vitesse des nœuds projetée sur la normale), pas à la trajectoire des nœuds.
+   C'est le point de méthode le plus important, et il vient du tank-treading.
+2. **Refaire le test des instants cachés**, cette fois sur une déformation non
+   affine. C'est là que l'étalon morphing doit enfin perdre — s'il ne perd pas,
+   c'est un vrai résultat négatif et il faut le dire.
+3. **Choisir le régime temporel.** Première campagne sur le transitoire
+   (`instants_transitoire`), là où la forme bouge.
+4. **Le volume comme juge**, comme sur la séquence synthétique : la donnée le
+   conserve à 0.0256 %, le champ appris doit s'en approcher.
+5. **La question pratique pour le BMBI** : combien d'instants faut-il vraiment ?
+   On peut maintenant y répondre en chiffres, c'est-à-dire dire à quelle
+   fréquence leur code EF doit sauvegarder.
+6. **Les courbures sur une vraie membrane** — le creux du parachute est un
+   détail à forte courbure, exactement ce sur quoi le réseau lissait de 16 %.
+
+Ordre suggéré : 3 → 2 → 1 → 4 → 5 → 6.
 
 ### Défaut trouvé et corrigé
 La formule `implicit_biconcave` (profil d'Evans-Fung, `np.where(r < 1, ...)`) a

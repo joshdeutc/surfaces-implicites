@@ -24,9 +24,17 @@ Convention partout : `f < 0` intérieur · `f = 0` surface · `f > 0` extérieur
 src/
   shapes.py       formes analytiques : sphère, ellipsoïde, globule biconcave,
                   globule rouge QUARTIQUE (Kuchel 2021), tore — et leurs normales
+  shapes_complexes.py  gyroïde, Chmutov, Barth, metaballs — le stress-test
+                  topologique, avec projection de Newton sur la surface
+  capsules.py     LES VRAIES DONNÉES DU BMBI : lecture mmap du dataset,
+                  recentrage, normales par triangle, export au format d'échange,
+                  et les mesures qui décrivent la déformation
   data.py         construction des jeux d'entraînement (triche / réaliste)
   model.py        réseaux : ImplicitMLP (Tanh), IGRNet (Softplus + init
                   géométrique + skip), FourierNet
+  model_siren.py  SIREN (Sitzmann 2020) — activations sinusoïdales, dérivées
+                  lisses à tous les ordres, initialisation critique
+  polyfit.py      ajustement algébrique de f par SVD (piste polynomiale)
   train.py        boucles d'entraînement : MSE et IGR
   reconstruct.py  évaluation sur grille 3D + marching cubes
   metrics.py      Chamfer, Hausdorff, IoU, eikonal — SANS la formule exacte
@@ -45,6 +53,8 @@ src/
   train_temporal.py  perte espace-temps (eikonal SPATIAL, t continu) et
                   dérivées ∇_x f, ∂f/∂t du champ appris
   visualize.py    figure 3D matplotlib (PNG)
+  viz_pv.py       rendu PyVista hors écran, caméra déterministe, champ scalaire
+                  aux sommets, exports OBJ / VTK / VTP / PVD
   device.py       CUDA / MPS (Apple) / CPU
 ```
 
@@ -61,8 +71,19 @@ src/
 | `main_morph.py` | morphing et booléens, sur formules et sur champs appris |
 | `main_curvature.py` | courbures du champ appris + contrôle Gauss-Bonnet |
 | `main_temporal.py` | **surface espace-temps** : un champ `f(x,y,z,t)` appris depuis six instants, testé sur cinq instants jamais vus |
+| `main_capsules.py` | **les vraies données du BMBI** : carte d'identité du dataset, et ce qu'il change |
+| `main_shapes.py` | surfaces complexes : topologie mesurée, puis apprentissage |
+| `main_siren.py` | comparaison Softplus / Fourier / SIREN, sans normales |
+| `main_render.py` | rendu PyVista et exports OBJ / VTK / VTP / PVD |
 | `validate_geometry.py` | 28 vérifications des outils géométriques sur des cas connus |
 | `reconstruct_from_cache.py` | refait figure et métrique sans réentraîner |
+
+## Les données du BMBI
+
+Le dataset de capsules (`Données/Data_Capsule/`) est **propriété du laboratoire
+BMBI et confidentiel** : il n'est pas versionné, et ne doit pas l'être. Les
+scripts qui en dépendent (`main_capsules.py`) échouent proprement s'il est
+absent, avec le rappel de la marche à suivre.
 
 ## Installation
 
@@ -93,6 +114,12 @@ ignoré par git.
 - `RESULTATS_temporel.md` — la surface qui évolue dans le temps : protocole,
   test sur instants cachés, conservation du volume, suivi lagrangien, et les
   contrôles qui disent ce que ces chiffres ne prouvent pas.
+- `RESULTATS_rendu_formes.md` — rendu PyVista et formats d'échange, surfaces
+  complexes (le stress-test topologique), et la comparaison d'architectures
+  avec SIREN.
+- `RESULTATS_capsules.md` — **les vraies données du BMBI** : le maillage passe
+  sans retouche, la déformation est prouvée non affine, 93 % du mouvement est
+  tangentiel, et un contrôle du projet doit être réécrit.
 
 ## Notes
 

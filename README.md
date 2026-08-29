@@ -25,13 +25,17 @@ TZ2_Surfaces_Implicites_Neuronales/
 ├── Encadrement/         la fiche d'enregistrement de la TZ + les 2 mails de Florian
 ├── Articles/            la biblio en PDF (DeepSDF, Occupancy Networks, RBC Kuchel)
 ├── Notebooks/           les notebooks du début, simples à lancer pour visualiser
-├── Données/             vide — en attente des capsules du BMBI
+├── Données/             les capsules du BMBI — CONFIDENTIEL, hors git
+├── Presentation/        les slides (soutenance.pdf) et leur source LaTeX
 └── Code/                le code sérieux
     ├── README.md          structure des modules et liste des scripts
     ├── PLAN.md            feuille de route et journal d'avancement
     ├── RESULTATS_courbures.md   courbures, invariants, Gauss-Bonnet
     ├── RESULTATS_nuage.md       apprendre depuis un nuage de points seul
     ├── RESULTATS_morphing.md    morphing, booléens, contrôle de la courbure
+    ├── RESULTATS_temporel.md    la surface espace-temps (le cœur du sujet)
+    ├── RESULTATS_rendu_formes.md  rendu VTK, surfaces complexes, SIREN
+    ├── RESULTATS_capsules.md    LES VRAIES DONNÉES DU BMBI
     ├── src/               les modules (formes, données, réseaux, géométrie, métriques)
     ├── main_*.py          un script par sujet d'étude
     ├── validate_geometry.py     les vérifications des outils géométriques
@@ -54,8 +58,13 @@ TZ2_Surfaces_Implicites_Neuronales/
   dedans/dehors + eikonal), les métriques, la géométrie différentielle et
   l'ajustement polynomial. Le détail est dans `Code/README.md` et `Code/PLAN.md`.
 
-- `Données/` — vide pour l'instant, c'est là qu'iront les données de capsules
-  quand Florian nous les enverra.
+- `Données/` — le dataset de capsules, reçu le 26/08/2026. **Propriété du
+  laboratoire BMBI, transmis sous clause de confidentialité** : le dossier est
+  exclu de git et ne doit jamais partir sur un dépôt distant, même privé. Voir
+  `Données/README.md` pour le contenu et le mode d'emploi.
+
+- `Presentation/` — les slides de présentation (`soutenance.pdf`, 15 slides dont
+  6 d'annexe) et leur source LaTeX.
 
 ## Par où commencer (si tu prends le train en route)
 
@@ -66,9 +75,12 @@ TZ2_Surfaces_Implicites_Neuronales/
 4. Lance `python Code/validate_geometry.py` : 28 vérifications sur des cas dont
    la réponse est connue d'avance. C'est le meilleur résumé de ce que le code
    sait faire.
-5. Si tu ne dois regarder qu'un seul résultat, c'est `Code/RESULTATS_temporel.md` :
-   c'est le cœur du sujet, et la figure y montre d'un coup d'œil ce que le réseau
-   a reçu et ce qu'il en a fait.
+5. Si tu ne dois regarder qu'un seul résultat de méthode, c'est
+   `Code/RESULTATS_temporel.md` : c'est le cœur du sujet, et la figure y montre
+   d'un coup d'œil ce que le réseau a reçu et ce qu'il en a fait.
+6. Et pour savoir où on en est vraiment, `Code/RESULTATS_capsules.md` : ce que
+   contiennent les vraies données, et en quoi elles remettent en cause deux
+   conclusions du travail synthétique.
 
 ## Où on en est
 
@@ -127,9 +139,43 @@ sur les *dérivées* : sur la vitesse normale, le réseau est **22 fois** plus j
 que le morphing. Ce qu'apporte une surface implicite espace-temps, ce n'est pas de
 mieux placer les points — c'est de posséder un champ de vitesse dérivable partout.
 
-**Ce qui reste.** Durcir le cas temporel — une déformation **non affine** est
-l'escalade la plus utile, puisque c'est elle qui rendrait le test d'interpolation
-discriminant. Ensuite : la robustesse au bruit et aux vues partielles, les familles
-de formes à code latent, l'affichage PyVista au format VTK (nommé deux fois dans la
-fiche), et surtout **brancher les vraies données du BMBI**, qui n'ont pas encore
-été fournies — `Données/` est vide. Le détail et l'ordre sont dans `Code/PLAN.md`.
+**Le rendu et la topologie.** L'affichage PyVista au format VTK est fait, avec
+export OBJ / VTK / VTP et série `.pvd` lisible par ParaView — chaque fichier étant
+relu et recompté. Et le seul stress-test topologique du projet est passé : sur les
+quatre surfaces complexes demandées par la fiche (Chmutov, gyroïde, Barth,
+metaballs), **deux ne sont pas fermées**, or tout le pipeline suppose un intérieur
+borné. Les metaballs donnent la démonstration la plus directe de l'argument du
+sujet : mêmes boules, seuil différent, `χ` passe de 0 à 2.
+
+## Les vraies données sont arrivées (26/08/2026)
+
+Florian a transmis le dataset du BMBI : une capsule déformable dans un canal,
+maillage triangulaire de 2562 nœuds matériels, 20001 pas de temps, 1.2 Go.
+**Confidentiel — `Données/` est hors git.**
+
+L'analyse est faite (`Code/RESULTATS_capsules.md`) et elle donne trois choses.
+
+**Le maillage entre dans la chaîne sans une retouche.** `χ = 2`, étanche, genre 0,
+volume signé positif donc normales déjà sortantes. Deux mois de travail construit
+« à l'aveugle » contre ces données tombent sur le bon format.
+
+**La limite n°1 du projet tombe.** On écrivait qu'il fallait durcir le cas
+temporel avec une déformation non affine. Les vraies capsules le sont : 14.9 % de
+résidu non affine entre snapshots voisins, contre 0 % sur notre séquence
+synthétique. Et mieux qu'un pourcentage, une preuve — la capsule part d'une sphère
+et **cesse d'être convexe** dès le pas 1500, or l'image affine d'un convexe est
+convexe. Le test d'interpolation devient discriminant, et l'étalon morphing part
+avec 15 % d'erreur.
+
+**Un de nos contrôles ne se transpose pas, et c'est instructif.** 93 % du
+mouvement des nœuds est **tangentiel** : la membrane tourne autour d'une forme qui
+bouge peu (tank-treading). On ne peut donc pas valider un suivi lagrangien en
+advectant un point par la vitesse normale et en le comparant à la trajectoire d'un
+nœud — ce sont deux choses différentes. Ce n'est pas un défaut du champ implicite :
+une surface ne porte que son mouvement normal. C'est même un argument pour la
+représentation implicite, qui sépare d'office ce qu'un maillage lagrangien confond.
+
+**Ce qui reste.** Apprendre `f(x,y,z,t)` sur la capsule réelle — c'est l'étape 14
+de `Code/PLAN.md`, avec son ordre de marche. Puis la robustesse au bruit et aux
+vues partielles, et les familles de formes à code latent. Reste aussi la rédaction
+du rapport, qui n'est pas commencée.
