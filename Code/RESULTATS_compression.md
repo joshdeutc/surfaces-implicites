@@ -60,6 +60,16 @@ fois plus longue, et le déplacement entre deux instants d'évaluation y monte �
 | 5 | 16 | 0.00546 | 0.00082 | 2.1× | 98.85 % | 24.3 % | χ = 2 |
 | 3 | 18 | 0.01038 | 0.00574 | 1.1× | 95.22 % | **73.8 %** | χ = 2 |
 
+![Quand ça marche, et quand ça casse](figures/capsules_quand_ca_casse.png)
+
+*Les surfaces prédites sont colorées par leur écart à la vraie surface, au point
+le plus proche d'un nuage dense tiré sur le maillage. Les douze vues partagent la
+même caméra et la même échelle : une différence visible est une différence de
+forme. Noter que l'échec à 3 instants n'est pas uniforme — il se concentre en
+bandes, là où la surface doit se déplacer le plus entre deux photos, et il
+s'efface près des instants observés (pas 900 est proche du pas 1000, qui est
+fourni).*
+
 **Ça casse entre 5 et 3.** À 3 instants, l'erreur sur la vitesse de la membrane
 atteint 74 % de son amplitude : le champ ne dit plus rien d'exploitable sur le
 mouvement, et l'avantage sur le morphing s'effondre à 1.1×.
