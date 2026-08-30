@@ -268,3 +268,60 @@ troisième décimale.
 | `src/capsules.py` | `champ_reference`, `echantillon_surface`, `vitesse_normale_maillage` |
 | `figures/capsules_temporel_*` | les figures des deux modes |
 | `output/capsules_temporel_*_resume.json` | tous les chiffres, pour être relus sans réentraîner |
+
+---
+
+## 11. Où est vraiment l'événement complexe ? (balayage des 20001 pas)
+
+On cherchait un moment de la séquence où la capsule **tourne** en 3D tout en se
+déformant fortement — le cas le plus dur qu'on puisse lui opposer. Le balayage
+complet, un instant tous les 25 pas, répond : **il n'y en a pas.**
+
+### La rotation était un mirage, et c'était un artefact de mesure
+
+Une première mesure donnait « 4036 °/1000 pas » au tout début et 80° de rotation
+cumulée. C'est faux, et pour une raison instructive : la rotation était lue sur le
+**grand axe du tenseur d'inertie**, or au pas 0 la capsule est une **sphère
+parfaite** (demi-axes égaux à 0.28868 aux sept décimales). Sur une sphère, les
+vecteurs propres sont dégénérés : ils sautent d'un instant à l'autre sans que rien
+ne tourne.
+
+En masquant la mesure là où la forme est trop ronde (rapport d'axes < 1.05), le
+chiffre honnête tombe à **17.3° de rotation cumulée sur toute la séquence**, avec
+un maximum de 16.8 °/1000 pas. La capsule s'incline lentement, elle ne bascule
+jamais.
+
+*Leçon de méthode, la troisième de cette campagne* : après le tank-treading et la
+convergence de la différence centrée, c'est le troisième contrôle de vitesse ou
+d'orientation à donner un chiffre d'allure crédible et faux. Un axe principal n'a
+de sens que si la forme est anisotrope.
+
+### La séquence contient un seul événement, et il est au début
+
+| | pas 0 → 2000 | pas 2000 → 20000 |
+|---|---|---|
+| rapport d'axes | 1.000 → **1.354** → 1.30 | 1.30 → 1.045, monotone |
+| écart à un ellipsoïde ¹ | 0 → **6.06 %** (max au pas 1700) | 4 à 5 %, plat |
+| défaut de convexité | apparaît : 0 → 1.7 % | 1.5 %, plat |
+| mouvement normal de la surface | maximal | décroît d'un facteur 10 |
+| part non affine entre voisins | 16 à 18 % | 13 à 17 % |
+
+¹ résidu de la meilleure application affine depuis la sphère initiale, rapporté au
+rayon — c'est-à-dire « à quel point cette forme n'est **pas** un ellipsoïde ».
+
+**Tout se passe dans les 2000 premiers pas** : la sphère s'écrase, atteint son
+maximum de déformation, développe sa concavité. Les 90 % restants du fichier sont
+une relaxation lente à forme presque constante.
+
+C'est cohérent avec ce que la campagne avait déjà découvert par l'échec : en
+échantillonnage uniforme, le seul instant où le réseau perdait contre le morphing
+était le premier. Le balayage dit pourquoi — c'est le seul endroit où il se passe
+quelque chose.
+
+### Ce que ça implique pour la suite
+
+La question « le champ espace-temps tient-il un événement complexe ? » se ramène
+donc à une fenêtre précise, `pas 0 à 2000`. Et comme la reconstruction y est déjà
+au plancher de la grille dès qu'on donne assez d'instants, la question qui a
+encore de la marge n'est plus *si* ça marche mais **avec combien de photos** :
+c'est l'objet de `main_capsules_event.py`.
