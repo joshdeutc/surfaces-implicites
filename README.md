@@ -37,6 +37,7 @@ TZ2_Surfaces_Implicites_Neuronales/
     ├── RESULTATS_rendu_formes.md  rendu VTK, surfaces complexes, SIREN
     ├── RESULTATS_capsules.md    LES VRAIES DONNÉES DU BMBI
     ├── RESULTATS_capsules_temporel.md  f(x,y,z,t) appris sur la vraie capsule
+    ├── RESULTATS_compression.md  combien d'instants faut-il ? (les 2 régimes)
     ├── src/               les modules (formes, données, réseaux, géométrie, métriques)
     ├── main_*.py          un script par sujet d'étude
     ├── validate_geometry.py     les vérifications des outils géométriques
@@ -207,7 +208,34 @@ de 18 % à 4.6 %, et l'excédent de Chamfer d'un facteur 50. Autrement dit :
 déformation, pas à intervalle constant.* C'est une réponse chiffrée à une question
 qui était ouverte.
 
-**Ce qui reste.** La fin de la séquence (pas 4000 à 20000, la relaxation lente),
-l'extrapolation au-delà du dernier instant observé, la robustesse au bruit et aux
-vues partielles, les familles de formes à code latent. Et la rédaction du rapport,
-qui n'est pas commencée — mais les six `RESULTATS_*.md` en sont la matière.
+## Combien d'instants faut-il vraiment ?
+
+Deux campagnes à protocole identique, une par régime de la séquence
+(`Code/RESULTATS_compression.md`). C'est la question pratique du labo, et la seule
+qui avait encore de la marge : dès qu'on donne assez d'instants, tout le monde est
+au plancher de la grille et rien ne départage les méthodes.
+
+| aux instants cachés | 11 obs. | 6 obs. | 5 obs. | 3 obs. |
+|---|---:|---:|---:|---:|
+| déformation rapide — erreur sur la vitesse | 6.3 % | 15.8 % | 24.3 % | **73.8 %** |
+| relaxation lente — erreur sur la vitesse | 26.0 % | 68.5 % | 78.1 % | 87.5 % |
+
+**Il y a un seuil net**, et sous 5 instants le champ de vitesse ne sert plus à rien
+— alors que la topologie, elle, reste juste (`χ = 2`). Un invariant topologique
+correct ne garantit donc rien sur la géométrie.
+
+**La réponse au BMBI** : sauvegarder quand la membrane a bougé d'environ une arête
+de maillage. Soit un échantillonnage non uniforme — resserré au début.
+
+**Et deux résultats qui contredisent ce qu'on attendait.** On pensait que le champ
+implicite brillerait dans le régime de tank-treading, puisque 93 % du mouvement y
+est tangentiel et qu'il le jette par construction. C'est le contraire : la forme y
+dérive lentement et presque linéairement, donc c'est le régime où une simple
+interpolation marche le mieux. Et le réseau **n'est pas un compresseur** — 773 Ko
+de poids contre 661 Ko pour les maillages qu'on lui donne. Ce qu'il achète, c'est
+de la continuité, pas de la place.
+
+**Ce qui reste.** Mesurer vraiment l'argument « implicite contre maillage
+lagrangien », qui reste structurel et non expérimental. Puis l'extrapolation, la
+robustesse au bruit, les familles de formes à code latent. Et la rédaction du
+rapport, qui n'est pas commencée — les sept `RESULTATS_*.md` en sont la matière.

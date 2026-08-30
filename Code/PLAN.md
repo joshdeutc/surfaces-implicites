@@ -39,6 +39,7 @@ initiale, qui sert seulement à valider la machinerie).
 | **12** | **Spatio-temporel `f(x,y,z,t)` + suivi d'un point (objectif final)** | `temporal.py`, `model_temporal.py`, `train_temporal.py` | fait |
 | 13 | Affichage PyVista au format VTK (nommé deux fois dans la fiche) | `viz_pv.py` | fait |
 | **14** | **Apprendre `f(x,y,z,t)` SUR LA CAPSULE RÉELLE** | `capsules.py`, `main_capsules_temporal.py` | **fait** |
+| **15** | **Combien d'instants faut-il ?** — les deux régimes de la séquence | `campagne.py`, `main_capsules_event.py`, `main_capsules_tanktread.py` | **fait** |
 
 Les étapes 5 à 8 viennent des recommandations de F. De Vuyst (`Encadrement/`) et
 du programme de la fiche d'enregistrement : les courbures (10 h prévues), la
@@ -358,10 +359,58 @@ interprétable.
 
 ---
 
+## Étape 15 — combien d'instants faut-il ? : fait
+
+Deux campagnes à protocole strictement identique (`src/campagne.py`), une par
+régime. Journal dans `RESULTATS_compression.md`.
+
+| aux instants cachés | 11 obs. | 6 obs. | 5 obs. | 3 obs. |
+|---|---:|---:|---:|---:|
+| **événement** (pas 0-2000) — erreur sur `v_n` | 6.3 % | 15.8 % | 24.3 % | **73.8 %** |
+| **événement** — excédent, × morphing | 1.3× | **2.4×** | 2.1× | 1.1× |
+| **tank-treading** (pas 4000-20000) — erreur sur `v_n` | 26.0 % | 68.5 % | 78.1 % | 87.5 % |
+| **tank-treading** — excédent, × morphing | 2.0× | **0.9×** | 0.9× | 1.0× |
+
+Quatre choses en sortent, dont deux qui contredisent ce qu'on attendait.
+
+**Il existe un seuil net.** Sous 5 instants sur l'événement, l'erreur de vitesse
+passe à 74 % : le champ ne dit plus rien d'exploitable sur le mouvement. La
+topologie, elle, reste correcte (`χ = 2`) même là — un invariant topologique juste
+ne garantit donc rien sur la géométrie.
+
+**L'avantage du réseau est maximal au MILIEU.** À 11 instants tout le monde est
+au plancher, à 3 personne n'y arrive ; c'est à 6 que l'écart se voit (2.4×).
+
+**La prédiction sur le tank-treading était fausse.** On attendait que l'implicite
+y brille, puisque 93 % du mouvement y est tangentiel. En fait c'est le régime où
+la forme dérive le plus lentement et le plus linéairement, donc celui où
+l'interpolation linéaire est la meilleure : en dessous de 11 instants le réseau
+fait jeu égal, voire un peu moins bien.
+
+**Le réseau n'est pas un compresseur.** 773 Ko de poids contre 661 Ko pour les 11
+maillages qu'on lui donne : il coûte 1.2 à 4.3 fois son entrée. Ce qu'il achète
+est de la continuité — valeur, dérivée, normale, courbure en tout point de
+l'espace-temps — pas de la place. Ne pas le présenter comme un argument de
+compression.
+
+**Défaut de cadrage assumé.** L'étalon morphing interpole entre deux formes, donc
+lui non plus ne stocke pas de trajectoires. Ce protocole n'oppose PAS l'implicite
+au maillage lagrangien : il oppose un champ neuronal à une interpolation linéaire
+de formes. L'argument sur le tank-treading reste vrai par construction, mais il
+est structurel et non mesuré ici.
+
+**La réponse au BMBI** : sauvegarder quand la membrane a bougé d'environ une arête
+de maillage — soit 5 à 6 instants sur la déformation rapide, 11 et plus sur la
+relaxation. Donc un échantillonnage non uniforme.
+
+---
+
 ## Ce qui reste, par ordre d'utilité
 
-1. **La fin de la séquence** (pas 4000 à 20000), non traitée : c'est une
-   relaxation lente, donc plus facile, mais c'est là qu'est le tank-treading pur.
+1. **Mesurer vraiment l'argument implicite contre maillage** : il faudrait un
+   troisième étalon, une séquence de maillages lagrangiens jugée sur sa capacité à
+   restituer la forme. C'est le seul moyen de sortir l'argument du registre
+   structurel. C'est désormais la piste la plus utile.
 2. **L'extrapolation** : tous les instants cachés testés sont ENCADRÉS par des
    instants observés. Rien n'a été demandé au-delà du dernier.
 3. **Étape 9 — robustesse** : bruit sur les points, vues partielles. Les capsules
